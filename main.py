@@ -98,13 +98,17 @@ class Bag:
 class GameCell(Button):
     """Individual playable cell in the game."""
 
+    class Pressed(Button.Pressed):
+        def __init__(self):
+            super().__init__()
+
     @staticmethod
     def at(row: int, col: int) -> str:
-        return f"cell-{row}-{col}"
+        return f"p{row}-{col}"
 
     @staticmethod
     def cell_label(row: int, col: int) -> str:
-        return f"p{row}-{col}"
+        return f"{row}-{col}"
 
     def __init__(self, row: int, col: int) -> None:
         self.row = row
@@ -150,8 +154,22 @@ class ScrabbleApp(App):
     ]
 
     def on_button_pressed(self, event: GameCell.Pressed):
-        if event.button.id == 'p8-8':
-            event.button.label = 'update'
+        for row in range(1, 16):
+            for col in range(1, 16):
+                if event.button.id == GameCell.at(row, col):
+                    event.button.letter = 'P'
+                    # event.button.label = GameCell
+
+                    if (row, col) in TRIPLE_LETTER_SCORE:
+                        event.button.label = f"{event.button.letter} : 3L"
+                    elif (row, col) in DOUBLE_LETTER_SCORE:
+                        event.button.label = f"{event.button.letter} : 2L"
+                    elif (row, col) in TRIPLE_WORD_SCORE:
+                        event.button.label = f"{event.button.letter} : 3W"
+                    elif (row, col) in DOUBLE_WORD_SCORE:
+                        event.button.label = f"{event.button.letter} : 2W"
+                    else:
+                        event.button.label = event.button.letter
 
     def compose(self):
         yield Header(show_clock=True)
@@ -189,9 +207,8 @@ class ScrabbleApp(App):
                 yield Static("13")
                 yield Static("14")
                 yield Static("15")
-            yield GameCell(8, 8)
-            # yield GameGrid()
-
+            # yield GameCell(8, 8)
+            yield GameGrid()
 
     def action_toggle_dark_mode(self):
         """Turn on / off dark mode"""
