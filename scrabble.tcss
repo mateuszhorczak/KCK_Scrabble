@@ -1,0 +1,59 @@
+$animation-type: linear;
+$animation-speed: 175ms;
+
+#app-container {
+    width: 98%;
+    height: 98%;
+}
+
+GameGrid {
+    margin-top: 1;
+    margin-left: 4;
+    layout: grid;
+    grid-size: 15 15;
+    layer: gameplay;
+    grid-columns: 13;
+    grid-rows: 3;
+}
+
+#nav-left {
+    margin-top: 2;
+    dock: left;
+    width: 2;
+    layout: grid;
+    grid-size: 1 15;
+    color: red;
+    grid-columns: 2;
+    grid-rows: 3;
+    text-style: bold;
+}
+
+#nav-top {
+    margin-left: 10;
+    dock: top;
+    height: 1;
+    layout: grid;
+    grid-size: 15 1;
+    color: red;
+    grid-columns: 13;
+    grid-rows: 1;
+    text-style: bold;
+}
+
+Header {
+    dock: top;
+    height: 1;
+
+}
+
+Footer {
+    height: 1;
+    dock: bottom;
+    layer: gameplay;
+}
+
+GameCell {
+    transition: background $animation-speed $animation-type, color $animation-speed $animation-type;
+    border: tall black;
+}
+
