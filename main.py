@@ -5,10 +5,13 @@ from textual.app import App, ComposeResult
 from textual.containers import Container, Vertical, Horizontal, ScrollableContainer
 from textual.css.query import NoMatches
 from textual.reactive import var, reactive
+from textual.validation import Validator, ValidationResult
 from textual.widget import Widget
-from textual.widgets import Footer, Header, Button, Digits, Static, RichLog
+from textual.widgets import Footer, Header, Button, Digits, Static, RichLog, Input
 
 BOARD = [[None for i in range(15)] for j in range(15)]
+
+ACTUAL_LETTER = ' '
 
 LETTER_VALUES = {
     "A": 1, "B": 3, "C": 3, "D": 2, "E": 1, "F": 4, "G": 2, "H": 4, "I": 1, "J": 1, "K": 5, "L": 1,
@@ -43,19 +46,14 @@ class Tile:
 
 class Bag:
     def __init__(self):
-        # Creates the bag full of game tiles, and calls the initialize_bag() method,
-        # which adds the default 100 tiles to the bag.
-        # Takes no arguments.
         self.bag = []
         self.initialize_bag()
 
     def add_to_bag(self, tile, quantity):
-        # Adds a certain quantity of a certain tile to the bag. Takes a tile and an integer quantity as arguments.
         for i in range(quantity):
             self.bag.append(tile)
 
     def initialize_bag(self):
-        # Adds the intiial 100 tiles to the bag.
         global LETTER_VALUES
         self.add_to_bag(Tile("A"), 9)
         self.add_to_bag(Tile("B"), 2)
@@ -96,8 +94,6 @@ class Bag:
 
 
 class GameCell(Button):
-    """Individual playable cell in the game."""
-
     class Pressed(Button.Pressed):
         def __init__(self):
             super().__init__()
@@ -127,20 +123,21 @@ class GameCell(Button):
 
 
 class GameGrid(Widget):
-    """The main playable grid of game cells."""
-
     def __init__(self):
         super().__init__()
 
     def compose(self) -> ComposeResult:
-        """Compose the game grid.
-
-        Returns:
-            ComposeResult: The result of composing the game grid.
-        """
         for row in range(1, 16):
             for col in range(1, 16):
                 yield GameCell(row, col)
+
+
+class IsALetter(Validator):
+    def validate(self, value: str) -> ValidationResult:
+        if value.upper() in LETTER_VALUES.keys():
+            return self.success()
+        else:
+            return self.failure()
 
 
 class ScrabbleApp(App):
@@ -157,8 +154,10 @@ class ScrabbleApp(App):
         for row in range(1, 16):
             for col in range(1, 16):
                 if event.button.id == GameCell.at(row, col):
-                    event.button.letter = 'P'
-                    # event.button.label = GameCell
+                    if event.button.letter == ' ':
+                        event.button.letter = ACTUAL_LETTER
+                    else:
+                        event.button.letter = ' '
 
                     if (row, col) in TRIPLE_LETTER_SCORE:
                         event.button.label = f"{event.button.letter} : 3L"
@@ -170,6 +169,19 @@ class ScrabbleApp(App):
                         event.button.label = f"{event.button.letter} : 2W"
                     else:
                         event.button.label = event.button.letter
+
+
+
+    def on_input_changed(self, event: Input.Changed):
+        global ACTUAL_LETTER
+        if not event.validation_result.is_valid:
+            pass
+
+            # self.query_one(Pretty).update(event.validation_result.failure_descriptions)
+        else:
+            ACTUAL_LETTER = event.input.value[0].upper()
+
+            # self.query_one(Pretty).update([])
 
     def compose(self):
         yield Header(show_clock=True)
@@ -209,6 +221,11 @@ class ScrabbleApp(App):
                 yield Static("15")
             # yield GameCell(8, 8)
             yield GameGrid()
+            yield Input(
+                id="enter_letter",
+                placeholder="Wpisz litere",
+                validators=IsALetter()
+                        )
 
     def action_toggle_dark_mode(self):
         """Turn on / off dark mode"""
