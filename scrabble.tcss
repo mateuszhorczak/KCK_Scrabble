@@ -29,7 +29,7 @@ GameGrid {
 }
 
 #nav-top {
-    margin-left: 10;
+    margin-left: 8;
     dock: top;
     height: 1;
     layout: grid;
@@ -57,6 +57,13 @@ GameCell {
     border: tall black;
 }
 
-#enter_letter {
+InformationLabel {
+    height: 5;
     dock: bottom;
+    margin-bottom: 1;
+}
+
+InformationLabel Label {
+    margin-bottom: 1;
+    color: green;
 }
