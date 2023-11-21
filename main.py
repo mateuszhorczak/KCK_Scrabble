@@ -16,7 +16,8 @@ BOARD = [[None for i in range(15)] for j in range(15)]
 
 ACTUAL_SCREEN = ''
 ACTUAL_LETTER = ' '
-PLAYERS_COUNT = 0
+"""default number of players is 2, but can increase to 4 in app"""
+PLAYERS_COUNT = 2
 
 LETTER_VALUES = {
     "A": 1, "B": 3, "C": 3, "D": 2, "E": 1, "F": 4, "G": 2, "H": 4, "I": 1, "J": 1, "K": 5, "L": 1,
@@ -201,17 +202,13 @@ def turn(player, board, bag):
         pass
 
 
-class PlayersCountInput(Input):
-    def __init__(self):
-        super().__init__(placeholder="Liczba graczy", validators=IsANumberOfPlayers(), validate_on=["submitted"])
-
-    class PlayersCountInputChanged(Input.Changed):
-        def __init__(self):
-            super().__init__()
-
-    class PlayersCountInputSubmitted(Input.Submitted):
-        def __init__(self):
-            super().__init__()
+# class PlayersCountInput(Input):
+#     def __init__(self):
+#         super().__init__(placeholder="Liczba graczy", validators=IsANumberOfPlayers(), validate_on=["submitted"])
+#
+#     class PlayersCountInputSubmitted(Input.Submitted):
+#         def __init__(self):
+#             super().__init__()
 
 
 class IsANumberOfPlayers(Validator):
@@ -337,27 +334,15 @@ class PlayersPretty(Pretty):
 
 
 class NicknameInsertPlace(Widget):
-    def __init__(self):
+    def __init__(self, player_number):
         super().__init__()
+        self.player_number = player_number
 
     def compose(self) -> ComposeResult:
-        with Vertical():
-            for i in range(int(PLAYERS_COUNT)):
-                with Horizontal(classes="userEnterNamePlace"):
-                    yield Label("Wpisz nazwe użytkownika: " + str(i + 1))
-                    yield Input(placeholder="Nazwa gracza", id="player" + str(i))
+        with Horizontal(classes="userEnterNamePlace"):
+            yield Label("Wpisz nazwe użytkownika: " + str(self.player_number))
+            yield Input(placeholder="Nazwa gracza", id="player" + str(self.player_number))
 
-
-class PlayerNamesScreen(Screen):
-    """Enter usernames screen"""
-    BINDINGS = [
-        ("escape", "app.pop_screen()", "Back"),
-    ]
-
-    def compose(self) -> ComposeResult:
-        yield Header(show_clock=True)
-        yield Footer()
-        yield NicknameInsertPlace()
 
 
 class HelpScreen(Screen):
@@ -367,11 +352,10 @@ class HelpScreen(Screen):
     ]
 
     def compose(self) -> ComposeResult:
-        global ACTUAL_SCREEN
-        ACTUAL_SCREEN = 'helpScreen'
         yield Header(show_clock=True)
         yield Footer()
-        yield Label("PLANSZA POMOCY")
+        with Horizontal(classes="information_container"):
+            yield Static("PLANSZA POMOCY", classes="information_tag")
 
 
 class GameScreen(Screen):
@@ -414,8 +398,6 @@ class GameScreen(Screen):
                     ACTUAL_LETTER = event.input.value[0].upper()
 
     def compose(self):
-        global ACTUAL_SCREEN
-        ACTUAL_SCREEN = 'gameScreen'
         yield Header(show_clock=True)
         yield Footer()
         with ScrollableContainer(id='app-container'):
@@ -432,7 +414,6 @@ class ScrabbleApp(App):
     SCREENS = {
         "help": HelpScreen(),
         "game": GameScreen(),
-        "player_names": PlayerNamesScreen(),
     }
 
     """Shortcuts"""
@@ -440,36 +421,51 @@ class ScrabbleApp(App):
         ("ctrl+d", "toggle_dark_mode", "Toggle dark mode"),
         ("ctrl+c", "quit", "Quit"),
         ("f2", "push_screen('help')", "Help"),
-        ("f3", "push_screen('player_names')", "Enter nicknames"),
         ("f4", "push_screen('game')", "Enter game"),
+        ("f5", "add_nickname_place", "add user"),
+        ("f6", "remove_nickname_place", "remove user"),
     ]
 
-    def on_input_submitted(self, event: PlayersCountInput.Submitted):
-        """Get number from input"""
-        global PLAYERS_COUNT
-        if event.validation_result is not None:
-            if not event.validation_result.is_valid or event.input.value is None:
-                pass
-            else:
-                if event.input.value == '':
-                    PLAYERS_COUNT = 0
-                else:
-                    PLAYERS_COUNT = event.input.value[0]
-                try:
-                    self.query_one(PlayersPretty).update(int(event.input.value[0]))
-                except:
-                    pass
+    # def on_input_submitted(self, event: PlayersCountInput.Submitted):
+    #     """Get number from input"""
+    #     global PLAYERS_COUNT
+    #     if event.validation_result is not None:
+    #         if not event.validation_result.is_valid or event.input.value is None:
+    #             pass
+    #         else:
+    #             if event.input.value == '':
+    #                 PLAYERS_COUNT = 0
+    #             else:
+    #                 PLAYERS_COUNT = event.input.value[0]
+    #             try:
+    #                 self.query_one(PlayersPretty).update(int(event.input.value[0]))
+    #             except:
+    #                 pass
 
     def compose(self) -> ComposeResult:
-        global ACTUAL_SCREEN
-        ACTUAL_SCREEN = 'startScreen'
         yield Header(show_clock=True)
         yield Footer()
-        yield Label("Witaj w grze Scrabble !")
-        yield PlayersCountInput()
-        with Horizontal():
-            yield Label("Podaj ilość graczy (2-4), Podano: ")
-            yield PlayersPretty(PLAYERS_COUNT)
+        with Horizontal(classes="information_container"):
+            yield Label("Witaj w grze Scrabble !", classes="information_tag")
+        yield ScrollableContainer(NicknameInsertPlace(1), NicknameInsertPlace(2), id="nicknamesPlaces")
+
+    def action_add_nickname_place(self) -> None:
+        """An action to add a nickname add for other player."""
+        global PLAYERS_COUNT
+        if PLAYERS_COUNT < 4:
+            PLAYERS_COUNT = PLAYERS_COUNT + 1
+            new_nickname_place = NicknameInsertPlace(PLAYERS_COUNT)
+            self.query_one("#nicknamesPlaces").mount(new_nickname_place)
+            new_nickname_place.scroll_visible()
+
+    def action_remove_nickname_place(self) -> None:
+        """Called to remove a nickname place."""
+        global PLAYERS_COUNT
+        if PLAYERS_COUNT > 2:
+            nickname_places = self.query("NicknameInsertPlace")
+            PLAYERS_COUNT = PLAYERS_COUNT - 1
+            if nickname_places:
+                nickname_places.last().remove()
 
     def action_toggle_dark_mode(self):
         """Turn on / off dark mode"""
