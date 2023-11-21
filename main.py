@@ -1,4 +1,5 @@
 from random import shuffle
+from typing import Any
 
 from textual import events, on
 from textual.app import App, ComposeResult
@@ -9,12 +10,13 @@ from textual.reactive import var, reactive
 from textual.screen import Screen
 from textual.validation import Validator, ValidationResult
 from textual.widget import Widget
-from textual.widgets import Footer, Header, Button, Digits, Static, RichLog, Input, Label
+from textual.widgets import Footer, Header, Button, Digits, Static, RichLog, Input, Label, Pretty
 
 BOARD = [[None for i in range(15)] for j in range(15)]
 
+ACTUAL_SCREEN = ''
 ACTUAL_LETTER = ' '
-PLAYERS_COUNT = '0'
+PLAYERS_COUNT = 0
 
 LETTER_VALUES = {
     "A": 1, "B": 3, "C": 3, "D": 2, "E": 1, "F": 4, "G": 2, "H": 4, "I": 1, "J": 1, "K": 5, "L": 1,
@@ -199,50 +201,22 @@ def turn(player, board, bag):
         pass
 
 
-
-class HelpScreen(Screen):
-    """Help screen"""
-    BINDINGS = [
-        ("escape", "app.pop_screen", "Back"),
-    ]
-
-    def compose(self) -> ComposeResult:
-        yield Header(show_clock=True)
-        yield Footer()
-        yield Label("PLANSZA POMOCY")
-
-
 class PlayersCountInput(Input):
     def __init__(self):
-        super().__init__(placeholder="Liczba graczy", validators=IsANumberOfPlayers(), validate_on=["changed"])
+        super().__init__(placeholder="Liczba graczy", validators=IsANumberOfPlayers(), validate_on=["submitted"])
 
+    class PlayersCountInputChanged(Input.Changed):
+        def __init__(self):
+            super().__init__()
 
-
-class LaunchScreen(Screen):
-    """Welcome screen with settings"""
-    BINDINGS = [
-        ("escape", "app.pop_screen", "Back"),
-    ]
-
-    def compose(self) -> ComposeResult:
-        yield Header(show_clock=True)
-        yield Footer()
-        yield Label("Witaj w grze Scrabble !")
-        yield Label("Podaj ilość graczy (2-4), Podano: " + PLAYERS_COUNT)
-        yield PlayersCountInput()
-
-    def on_input_changed(self, event: PlayersCountInput.Changed):
-        """Get number from input"""
-        global PLAYERS_COUNT
-        if event.validation_result is not None:
-            if not event.validation_result.is_valid:
-                pass
-            else:
-                PLAYERS_COUNT = event.input.value[0]
+    class PlayersCountInputSubmitted(Input.Submitted):
+        def __init__(self):
+            super().__init__()
 
 
 class IsANumberOfPlayers(Validator):
     """Check if the char is a number of players"""
+
     def validate(self, value: str) -> ValidationResult:
         if value in {"2", "3", "4"}:
             return self.success()
@@ -250,9 +224,9 @@ class IsANumberOfPlayers(Validator):
             return self.failure()
 
 
-
 class GameCell(Button):
     """Single field"""
+
     class Pressed(Button.Pressed):
         def __init__(self):
             super().__init__()
@@ -283,6 +257,7 @@ class GameCell(Button):
 
 class GameGrid(Widget):
     """Display board"""
+
     def __init__(self):
         super().__init__()
 
@@ -327,6 +302,7 @@ class GameGrid(Widget):
 
 class IsALetter(Validator):
     """Check if the char is a letter"""
+
     def validate(self, value: str) -> ValidationResult:
         if value.upper() in LETTER_VALUES.keys() or value == '':
             return self.success()
@@ -336,13 +312,16 @@ class IsALetter(Validator):
 
 class LetterInput(Input):
     def __init__(self):
-        super().__init__(placeholder="Wpisz litere", validators=IsALetter(), validate_on=["changed"])
+        super().__init__(placeholder="Wpisz litere", validators=IsALetter(), validate_on=["submitted"])
 
-
+    class LetterSubmitted(Input.Submitted):
+        def __init__(self):
+            super().__init__()
 
 
 class InformationLabel(Widget):
     """Widget contains a Label and Input for display an information and enter a letter"""
+
     def __init__(self):
         super().__init__()
 
@@ -352,23 +331,53 @@ class InformationLabel(Widget):
             yield LetterInput()
 
 
-class ScrabbleApp(App):
-    CSS_PATH = "scrabble.tcss"
+class PlayersPretty(Pretty):
+    def __init__(self, object: Any):
+        super().__init__(object)
 
-    TITLE = "SCRABBLE"
 
-    """SCREEN VIEWS"""
-    SCREENS = {
-        "help": HelpScreen(),
-        "launch": LaunchScreen(),
-    }
+class NicknameInsertPlace(Widget):
+    def __init__(self):
+        super().__init__()
 
-    """Shortcuts"""
+    def compose(self) -> ComposeResult:
+        with Vertical():
+            for i in range(int(PLAYERS_COUNT)):
+                with Horizontal(classes="userEnterNamePlace"):
+                    yield Label("Wpisz nazwe użytkownika: " + str(i + 1))
+                    yield Input(placeholder="Nazwa gracza", id="player" + str(i))
+
+
+class PlayerNamesScreen(Screen):
+    """Enter usernames screen"""
     BINDINGS = [
-        ("ctrl+d", "toggle_dark_mode", "Toggle dark mode"),
-        ("ctrl+c", "quit", "Quit"),
-        ("f2", "push_screen('help')", "Help"),
-        ("f3", "push_screen('launch')", "Launch Screen")
+        ("escape", "app.pop_screen()", "Back"),
+    ]
+
+    def compose(self) -> ComposeResult:
+        yield Header(show_clock=True)
+        yield Footer()
+        yield NicknameInsertPlace()
+
+
+class HelpScreen(Screen):
+    """Help screen"""
+    BINDINGS = [
+        ("escape", "app.pop_screen()", "Back"),
+    ]
+
+    def compose(self) -> ComposeResult:
+        global ACTUAL_SCREEN
+        ACTUAL_SCREEN = 'helpScreen'
+        yield Header(show_clock=True)
+        yield Footer()
+        yield Label("PLANSZA POMOCY")
+
+
+class GameScreen(Screen):
+    """Main game screen"""
+    BINDINGS = [
+        ("escape", "app.pop_screen()", "Back"),
     ]
 
     def on_button_pressed(self, event: GameCell.Pressed):
@@ -392,7 +401,7 @@ class ScrabbleApp(App):
                     else:
                         event.button.label = event.button.letter
 
-    def on_input_changed(self, event: LetterInput.Changed):
+    def on_input_submitted(self, event: LetterInput.Submitted):
         """Get letter from input"""
         global ACTUAL_LETTER
         if event.validation_result is not None:
@@ -405,11 +414,62 @@ class ScrabbleApp(App):
                     ACTUAL_LETTER = event.input.value[0].upper()
 
     def compose(self):
+        global ACTUAL_SCREEN
+        ACTUAL_SCREEN = 'gameScreen'
         yield Header(show_clock=True)
         yield Footer()
         with ScrollableContainer(id='app-container'):
             yield GameGrid()
             yield InformationLabel()
+
+
+class ScrabbleApp(App):
+    CSS_PATH = "scrabble.tcss"
+
+    TITLE = "SCRABBLE"
+
+    """SCREEN VIEWS"""
+    SCREENS = {
+        "help": HelpScreen(),
+        "game": GameScreen(),
+        "player_names": PlayerNamesScreen(),
+    }
+
+    """Shortcuts"""
+    BINDINGS = [
+        ("ctrl+d", "toggle_dark_mode", "Toggle dark mode"),
+        ("ctrl+c", "quit", "Quit"),
+        ("f2", "push_screen('help')", "Help"),
+        ("f3", "push_screen('player_names')", "Enter nicknames"),
+        ("f4", "push_screen('game')", "Enter game"),
+    ]
+
+    def on_input_submitted(self, event: PlayersCountInput.Submitted):
+        """Get number from input"""
+        global PLAYERS_COUNT
+        if event.validation_result is not None:
+            if not event.validation_result.is_valid or event.input.value is None:
+                pass
+            else:
+                if event.input.value == '':
+                    PLAYERS_COUNT = 0
+                else:
+                    PLAYERS_COUNT = event.input.value[0]
+                try:
+                    self.query_one(PlayersPretty).update(int(event.input.value[0]))
+                except:
+                    pass
+
+    def compose(self) -> ComposeResult:
+        global ACTUAL_SCREEN
+        ACTUAL_SCREEN = 'startScreen'
+        yield Header(show_clock=True)
+        yield Footer()
+        yield Label("Witaj w grze Scrabble !")
+        yield PlayersCountInput()
+        with Horizontal():
+            yield Label("Podaj ilość graczy (2-4), Podano: ")
+            yield PlayersPretty(PLAYERS_COUNT)
 
     def action_toggle_dark_mode(self):
         """Turn on / off dark mode"""

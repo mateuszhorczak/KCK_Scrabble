@@ -67,3 +67,14 @@ InformationLabel Label {
     margin-bottom: 1;
     color: green;
 }
+
+
+PlayersCountInput {
+    margin-bottom: 1;
+    dock: bottom;
+}
+
+.userEnterNamePlace {
+    margin-top: 2;
+    color: cyan;
+}
