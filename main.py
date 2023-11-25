@@ -12,27 +12,55 @@ from textual.validation import Validator, ValidationResult
 from textual.widget import Widget
 from textual.widgets import Footer, Header, Button, Digits, Static, RichLog, Input, Label, Pretty
 
-BOARD = [[None for i in range(15)] for j in range(15)]
-
 ACTUAL_SCREEN = ''
 ACTUAL_LETTER = ' '
+
 """default number of players is 2, but can increase to 4 in app"""
-PLAYERS_COUNT = 2
+NUMBER_OF_PLAYERS = 2
+PLAYERS = []
+PLAYERS_NICKNAMES = ['', '', '', '']
+ROUND_NUMBER = 1
+SKIPPED_TURNS = 0
+ACTUAL_WORD_WITH_COORDS = []
+BOARD = None
+DICTIONARY = None
 
 LETTER_VALUES = {
     "A": 1, "B": 3, "C": 3, "D": 2, "E": 1, "F": 4, "G": 2, "H": 4, "I": 1, "J": 1, "K": 5, "L": 1,
     "M": 3, "N": 1, "O": 1, "P": 3, "Q": 10, "R": 1, "S": 1, "T": 1, "U": 1, "V": 4, "W": 4, "X": 8,
-    "Y": 4, "Z": 10, "#": 0
+    "Y": 4, "Z": 10
 }
 
-TRIPLE_WORD_SCORE = [(1, 1), (8, 1), (15, 1), (1, 8), (15, 8), (1, 15), (8, 15), (15, 15), (8, 8)]
-DOUBLE_WORD_SCORE = [(2, 2), (3, 3), (4, 4), (5, 5), (2, 14), (3, 13), (4, 12), (5, 11), (14, 2), (13, 3), (12, 4),
-                     (11, 5), (14, 14), (13, 13), (12, 12), (11, 11)]
-TRIPLE_LETTER_SCORE = [(2, 6), (2, 10), (6, 2), (6, 6), (6, 10), (6, 14), (10, 2), (10, 6), (10, 10), (10, 14), (14, 6),
-                       (14, 10)]
-DOUBLE_LETTER_SCORE = [(1, 4), (1, 12), (3, 7), (3, 9), (4, 1), (4, 8), (4, 15), (7, 3), (7, 7), (7, 9), (7, 13),
-                       (8, 4), (8, 12), (9, 3), (9, 7), (9, 9), (9, 13), (12, 1), (12, 8), (12, 15), (13, 7), (13, 9),
-                       (15, 4), (15, 12)]
+TRIPLE_WORD_SCORE = [
+    (0, 0), (7, 0), (14, 0), (0, 7), (14, 7), (0, 14), (7, 14), (14, 14), (7, 7)
+]
+DOUBLE_WORD_SCORE = [
+    (1, 1), (2, 2), (3, 3), (4, 4), (1, 13), (2, 12), (3, 11), (4, 10), (13, 1), (12, 2), (11, 3), (10, 4), (13, 13),
+    (12, 12), (11, 11), (10, 10)
+]
+TRIPLE_LETTER_SCORE = [
+    (1, 5), (1, 9), (5, 1), (5, 5), (5, 9), (5, 13), (9, 1), (9, 5), (9, 9), (9, 13), (13, 5), (13, 9)
+]
+DOUBLE_LETTER_SCORE = [
+    (0, 3), (0, 11), (2, 6), (2, 8), (3, 0), (3, 7), (3, 14), (6, 2), (6, 6), (6, 8), (6, 12), (7, 3), (7, 11), (8, 2),
+    (8, 6), (8, 8), (8, 12), (11, 0), (11, 7), (11, 14), (12, 6), (12, 8), (14, 3), (14, 11)
+]
+
+
+class Letter:
+    def __init__(self, x, y, value):
+        self.x = x
+        self.y = y
+        self.value = value
+
+    def get_x(self):
+        return self.x
+
+    def get_y(self):
+        return self.y
+
+    def get_value(self):
+        return self.value
 
 
 class Tile:
@@ -61,7 +89,7 @@ class Bag:
 
     def initialize_bag(self):
         global LETTER_VALUES
-        self.add_to_bag(Tile("A"), 9)
+        self.add_to_bag(Tile("A"), 10)
         self.add_to_bag(Tile("B"), 2)
         self.add_to_bag(Tile("C"), 2)
         self.add_to_bag(Tile("D"), 4)
@@ -71,7 +99,7 @@ class Bag:
         self.add_to_bag(Tile("H"), 2)
         self.add_to_bag(Tile("I"), 9)
         self.add_to_bag(Tile("J"), 9)
-        self.add_to_bag(Tile("K"), 1)
+        self.add_to_bag(Tile("K"), 2)
         self.add_to_bag(Tile("L"), 4)
         self.add_to_bag(Tile("M"), 2)
         self.add_to_bag(Tile("N"), 6)
@@ -87,7 +115,6 @@ class Bag:
         self.add_to_bag(Tile("X"), 1)
         self.add_to_bag(Tile("Y"), 2)
         self.add_to_bag(Tile("Z"), 1)
-        self.add_to_bag(Tile("#"), 2)
         shuffle(self.bag)
 
     def take_from_bag(self):
@@ -178,37 +205,260 @@ class Player:
         return self.score
 
 
-# class Word: # TODO later
-#     def __init__(self, locations, player, board):
-#         self.locations = locations
-#         self.player = player
-#         self.board = board
-#
-#     def check_words(self):
-#         word_score = 0
-#         global dictionary
-#         if "dictionary" not in globals():
-#             dictionary = open("dic.txt").read().splitlines()
-#
-#         current_board_ltr = ""
-#         needed_tiles = ""
-#         blank_tile_val = ""
+class Board:
+    """
+    Creates the scrabble board.
+    """
+
+    def __init__(self):
+        # Creates a 2-dimensional array that will serve as the board.
+        self.board = [[None for i in range(15)] for j in range(15)]
+
+    def get_board_array(self):
+        # Returns the 2-dimensional board array.
+        return self.board
 
 
-def turn(player, board, bag):
-    global round_number, players, skipped_turns
+class Word:
+    def __init__(self, player, word, used_other_word):
+        self.word = word.upper()
+        self.player = player
+        self.used_other_word = used_other_word
 
-    if (skipped_turns < 6) or (player.rack.get_rack_length() == 0 and bag.get_remaining_tiles() == 0):
-        pass
+    def check_words(self):
+        global DICTIONARY
+        if DICTIONARY is None:
+            DICTIONARY = open("dic.txt").read().splitlines()
+
+        """if invalid word"""
+        if self.word not in DICTIONARY:
+            return "Invalid word, not in dictionary"
+
+        if not self.used_other_word and ROUND_NUMBER != 1:
+            return "After first round you must use other word to create your word!!"
+
+        if ROUND_NUMBER == 1:
+            contains_start_field = False
+            for letter in ACTUAL_WORD_WITH_COORDS:
+                if letter.get_x() == 7 and letter.get_y() == 7:
+                    contains_start_field = True
+
+            if not contains_start_field:
+                return "At first round you must use start field: 8:8"
+
+        return "Valid word"
+
+    def calculate_word_score(self):
+        global LETTER_VALUES, TRIPLE_WORD_SCORE, DOUBLE_WORD_SCORE, TRIPLE_LETTER_SCORE, DOUBLE_LETTER_SCORE
+        word_score = 0
+
+        """If letter place in letter premium spot"""
+        for letter in ACTUAL_WORD_WITH_COORDS:
+            if (letter.get_x(), letter.get_y()) in TRIPLE_LETTER_SCORE:
+                word_score += LETTER_VALUES[letter.get_value()] * 3
+
+            if (letter.get_x(), letter.get_y()) in DOUBLE_LETTER_SCORE:
+                word_score += LETTER_VALUES[letter.get_value()] * 2
+
+        """If letter place in word premium spot"""
+        for letter in ACTUAL_WORD_WITH_COORDS:
+            if (letter.get_x(), letter.get_y()) in TRIPLE_WORD_SCORE:
+                word_score *= 3
+
+            if (letter.get_x(), letter.get_y()) in DOUBLE_WORD_SCORE:
+                word_score *= 2
+
+        self.player.increase_score(word_score)
 
 
-# class PlayersCountInput(Input):
-#     def __init__(self):
-#         super().__init__(placeholder="Liczba graczy", validators=IsANumberOfPlayers(), validate_on=["submitted"])
-#
-#     class PlayersCountInputSubmitted(Input.Submitted):
-#         def __init__(self):
-#             super().__init__()
+def turn(player, bag):
+    global ROUND_NUMBER, SKIPPED_TURNS, ACTUAL_WORD_WITH_COORDS, BOARD
+    """if is true direction of word is horizontal, else direction is vertical"""
+    direction_horizontal = True
+    used_other_word = False
+    word_to_play = ''
+
+    if (SKIPPED_TURNS < 6) or (player.rack.get_rack_length() == 0 and bag.get_remaining_tiles() == 0):
+        if ACTUAL_WORD_WITH_COORDS[0].get_x() == ACTUAL_WORD_WITH_COORDS[1].get_x():
+            direction_horizontal = False
+        elif ACTUAL_WORD_WITH_COORDS[0].get_y() == ACTUAL_WORD_WITH_COORDS[1].get_y():
+            direction_horizontal = True
+        else:
+            """not valid word"""
+            return
+
+        if direction_horizontal:
+            """Sort letters by x-coordinate"""
+            ACTUAL_WORD_WITH_COORDS.sort(key=lambda letter: letter.get_x())
+            row_number = ACTUAL_WORD_WITH_COORDS[0].get_y()
+
+            """Check if letters that user placed stand next to each other"""
+            for letter_in_word, l in enumerate(ACTUAL_WORD_WITH_COORDS):
+
+                """If they are not next to each other, check if the user used a letter that is already on the board"""
+                if (letter_in_word.get_x() != ACTUAL_WORD_WITH_COORDS[l + 1].get_x()
+                        and letter_in_word.get_x() < ACTUAL_WORD_WITH_COORDS[l + 1].get_x()):
+
+                    index_before_break = letter_in_word.get_x()
+                    index_after_break = ACTUAL_WORD_WITH_COORDS[l + 1].get_x()
+
+                    """Iterates over a break"""
+                    break_letters = ''
+                    for j in range(index_before_break + 1, index_after_break):
+
+                        """Check if something place in break is between letters"""
+                        if BOARD.get_board_array()[row_number][j] is not None:
+                            break_letters += BOARD.get_board_array()[row_number][j].get_value()
+                        else:
+                            """Lack of continuity. INVALID WORD"""  # TODO check
+                            return
+
+                    """Combine user letters with letters on the board"""
+                    new_word = word_to_play + break_letters + letter_in_word.get_value()
+                    word_to_play = new_word
+                    used_other_word = True
+
+                    """if it is a last user letter"""
+                elif not letter_in_word.get_x() < ACTUAL_WORD_WITH_COORDS[l + 1].get_x():
+                    word_to_play += letter_in_word.get_value()
+
+                    """letter is not last and dont have break, common case"""
+                else:
+                    word_to_play += letter_in_word.get_value()
+
+            """Check if user used letters from board at start or end of his word"""
+            first_coordinate = ACTUAL_WORD_WITH_COORDS[0].get_x()
+            last_coordinate = ACTUAL_WORD_WITH_COORDS[-1].get_x()
+
+            """if additional letter at start of his word"""
+            i = 0
+            while True:
+                if BOARD.get_board_array()[row_number][first_coordinate - i] is not None:
+                    word_to_play = BOARD.get_board_array()[row_number][first_coordinate - i].get_value() + word_to_play
+                    ACTUAL_WORD_WITH_COORDS.append(
+                        Letter(
+                            row_number,
+                            first_coordinate - i,
+                            BOARD.get_board_array()[row_number][first_coordinate - i]
+                        )
+                    )
+                    used_other_word = True
+                    i += 1
+                else:
+                    break
+
+            """If additional letter at end of his word"""
+            i = 0
+            while True:
+                if BOARD.get_board_array()[row_number][last_coordinate + i] is not None:
+                    word_to_play = word_to_play + BOARD.get_board_array()[row_number][last_coordinate + i].get_value()
+
+                    ACTUAL_WORD_WITH_COORDS.append(
+                        Letter(
+                            row_number,
+                            last_coordinate + i,
+                            BOARD.get_board_array()[row_number][last_coordinate + i]
+                        )
+                    )
+                    used_other_word = True
+                    i += 1
+                else:
+                    break
+            ACTUAL_WORD_WITH_COORDS.sort(key=lambda letter: letter.get_x())
+
+        else:
+            """Sort letters by y-coordinate"""
+            ACTUAL_WORD_WITH_COORDS.sort(key=lambda letter: letter.get_y())
+            col_number = ACTUAL_WORD_WITH_COORDS[0].get_x()
+
+            """Check if letters that user placed stand next to each other"""
+            for letter_in_word, l in enumerate(ACTUAL_WORD_WITH_COORDS):
+
+                """If they are not next to each other, check if the user used a letter that is already on the board"""
+                if (letter_in_word.get_y() != ACTUAL_WORD_WITH_COORDS[l + 1].get_y()
+                        and letter_in_word.get_y() < ACTUAL_WORD_WITH_COORDS[l + 1].get_y()):
+
+                    index_before_break = letter_in_word.get_y()
+                    index_after_break = ACTUAL_WORD_WITH_COORDS[l + 1].get_y()
+
+                    """Iterates over a break"""
+                    break_letters = ''
+                    for j in range(index_before_break + 1, index_after_break):
+
+                        """Check if something place in break is between letters"""
+                        if BOARD.get_board_array()[col_number][j] is not None:
+                            break_letters += BOARD.get_board_array()[col_number][j].get_value()
+                        else:
+                            """Lack of continuity. INVALID WORD"""  # TODO check
+                            return
+
+                    """Combine user letters with letters on the board"""
+                    new_word = word_to_play + break_letters + letter_in_word.get_value()
+                    word_to_play = new_word
+                    used_other_word = True
+
+                    """if it is a last user letter"""
+                elif not letter_in_word.get_y() < ACTUAL_WORD_WITH_COORDS[l + 1].get_y():
+                    word_to_play += letter_in_word.get_value()
+
+                    """letter is not last and dont have break, common case"""
+                else:
+                    word_to_play += letter_in_word.get_value()
+
+            """Check if user used letters from board at start or end of his word"""
+            first_coordinate = ACTUAL_WORD_WITH_COORDS[0].get_y()
+            last_coordinate = ACTUAL_WORD_WITH_COORDS[-1].get_y()
+
+            """if additional letter at start of his word"""
+            i = 0
+            while True:
+                if BOARD.get_board_array()[first_coordinate - i][col_number] is not None:
+                    word_to_play = BOARD.get_board_array()[first_coordinate - i][col_number].get_value() + word_to_play
+                    ACTUAL_WORD_WITH_COORDS.append(
+                        Letter(
+                            first_coordinate - i,
+                            col_number,
+                            BOARD.get_board_array()[first_coordinate - i][col_number]
+                        )
+                    )
+                    used_other_word = True
+                    i += 1
+                else:
+                    break
+
+            """If additional letter at end of his word"""
+            i = 0
+            while True:
+                if BOARD.get_board_array()[last_coordinate + i][col_number] is not None:
+                    word_to_play = word_to_play + BOARD.get_board_array()[last_coordinate + i][col_number].get_value()
+                    ACTUAL_WORD_WITH_COORDS.append(
+                        Letter(
+                            last_coordinate + i,
+                            col_number,
+                            BOARD.get_board_array()[last_coordinate + i][col_number]
+                        )
+                    )
+                    used_other_word = True
+                    i += 1
+                else:
+                    break
+            ACTUAL_WORD_WITH_COORDS.sort(key=lambda letter: letter.get_y())
+
+        word = Word(player, word_to_play, used_other_word)
+
+
+def start_game():
+    """Function that start the game"""
+    global PLAYERS, NUMBER_OF_PLAYERS, PLAYERS_NICKNAMES, BOARD
+    for i in range(NUMBER_OF_PLAYERS):
+        PLAYERS.append(Player(Bag()))
+        PLAYERS[i].set_name(PLAYERS_NICKNAMES[i])
+
+    BOARD = Board()
+    bag = Bag()
+
+    current_player = PLAYERS[0]
+    # turn(current_player, bag)
 
 
 class IsANumberOfPlayers(Validator):
@@ -231,10 +481,6 @@ class GameCell(Button):
     @staticmethod
     def at(row: int, col: int) -> str:
         return f"p{row}-{col}"
-
-    @staticmethod
-    def cell_label(row: int, col: int) -> str:
-        return f"{row}-{col}"
 
     def __init__(self, row: int, col: int) -> None:
         self.row = row
@@ -260,40 +506,13 @@ class GameGrid(Widget):
 
     def compose(self) -> ComposeResult:
         with Vertical(id="nav-left"):
-            yield Static("1")
-            yield Static("2")
-            yield Static("3")
-            yield Static("4")
-            yield Static("5")
-            yield Static("6")
-            yield Static("7")
-            yield Static("8")
-            yield Static("9")
-            yield Static("10")
-            yield Static("11")
-            yield Static("12")
-            yield Static("13")
-            yield Static("14")
-            yield Static("15")
+            for i in range(15):
+                yield Static(str(i + 1))
         with Horizontal(id="nav-top"):
-            yield Static("1")
-            yield Static("2")
-            yield Static("3")
-            yield Static("4")
-            yield Static("5")
-            yield Static("6")
-            yield Static("7")
-            yield Static("8")
-            yield Static("9")
-            yield Static("10")
-            yield Static("11")
-            yield Static("12")
-            yield Static("13")
-            yield Static("14")
-            yield Static("15")
-
-        for row in range(1, 16):
-            for col in range(1, 16):
+            for i in range(15):
+                yield Static(str(i + 1))
+        for row in range(15):
+            for col in range(15):
                 yield GameCell(row, col)
 
 
@@ -307,7 +526,19 @@ class IsALetter(Validator):
             return self.failure()
 
 
+class IsANickname(Validator):
+    """Check if the string can be a nickname"""
+
+    def validate(self, value: str) -> ValidationResult:
+        if len(value) > 2 and value != '   ':
+            return self.success()
+        else:
+            return self.failure()
+
+
 class LetterInput(Input):
+    """Input used to enter letter in game"""
+
     def __init__(self):
         super().__init__(placeholder="Wpisz litere", validators=IsALetter(), validate_on=["submitted"])
 
@@ -324,29 +555,139 @@ class InformationLabel(Widget):
 
     def compose(self) -> ComposeResult:
         with Vertical():
-            yield Label("runda: ")
-            yield LetterInput()
+            with Horizontal():
+                yield Label("runda: ")
+                yield RoundNumberPretty(ROUND_NUMBER)
+                yield Label("Gracz: ")
+                yield PlayerNameLabelPretty(PLAYERS[0].name)
+                yield Label("literki: ")
+                yield UserLettersPretty(PLAYERS[0].get_rack_str())
+            with Horizontal():
+                yield LetterInput()
+                yield Button(label="Zatwierdź ruch", variant="success", id="confirm_button")
+                yield Button(label="Pomiń turę", variant="warning", id="pass_button")
+
+    @on(Button.Pressed, "#confirm_button")
+    def pass_pressed(self, event: Button.Pressed):
+        global ROUND_NUMBER
+        ROUND_NUMBER += 1
+        self.query_one(RoundNumberPretty).update(ROUND_NUMBER)
+
+        player_index = ROUND_NUMBER - 1
+        while True:
+            if player_index < len(PLAYERS):
+                break
+            else:
+                player_index -= len(PLAYERS)
+
+        self.query_one(PlayerNameLabelPretty).update(PLAYERS[player_index].name)
+        self.query_one(UserLettersPretty).update(PLAYERS[player_index].get_rack_str())
+
+    @on(Button.Pressed, "#pass_button")
+    def confirm_pressed(self, event: Button.Pressed):
+        global ROUND_NUMBER
+        ROUND_NUMBER += 1
+        self.query_one(RoundNumberPretty).update(ROUND_NUMBER)
+
+        player_index = ROUND_NUMBER - 1
+        while True:
+            if player_index < len(PLAYERS):
+                break
+            else:
+                player_index -= len(PLAYERS)
+
+        self.query_one(PlayerNameLabelPretty).update(PLAYERS[player_index].name)
 
 
-class PlayersPretty(Pretty):
+class UserLettersPretty(Pretty):
+    """Field displaying user letters"""
+
+    def __init__(self, object: Any):
+        super().__init__(object)
+
+
+class PlayerNameLabelPretty(Pretty):
+    """Field displaying number of round"""
+
+    def __init__(self, object: Any):
+        super().__init__(object)
+
+
+class RoundNumberPretty(Pretty):
+    """Field displaying number of round"""
+
+    def __init__(self, object: Any):
+        super().__init__(object)
+
+
+class PlayerNamePretty(Pretty):
+    """Field displaying the entered username"""
+
+    def __init__(self, object: Any):
+        super().__init__(object)
+        
+
+class ScorePretty(Pretty):
+    """Field displaying the score"""
     def __init__(self, object: Any):
         super().__init__(object)
 
 
 class NicknameInsertPlace(Widget):
+    """Container used to get single nickname from user"""
+
     def __init__(self, player_number):
         super().__init__()
+        global PLAYERS_NICKNAMES
         self.player_number = player_number
+        self.player_name = 'user' + str(self.player_number)
+        PLAYERS_NICKNAMES[self.player_number - 1] = self.player_name
 
     def compose(self) -> ComposeResult:
         with Horizontal(classes="userEnterNamePlace"):
             yield Label("Wpisz nazwe użytkownika: " + str(self.player_number))
-            yield Input(placeholder="Nazwa gracza", id="player" + str(self.player_number))
+            yield Input(placeholder="Nazwa gracza", id="player" + str(self.player_number), validators=IsANickname())
+        yield PlayerNamePretty(self.player_name)
 
+    def on_input_submitted(self, event: Input.Submitted):
+        """Get number from input"""
+
+        global NUMBER_OF_PLAYERS, PLAYERS_NICKNAMES
+        if event.validation_result is not None:
+            if not event.validation_result.is_valid:
+                pass
+            else:
+                if event.input.value == '':
+                    self.player_name = 'user' + str(self.player_number)
+                else:
+                    self.player_name = event.input.value
+                try:
+                    self.query_one(PlayerNamePretty).update(self.player_name)
+                    PLAYERS_NICKNAMES[self.player_number - 1] = self.player_name
+                except:
+                    pass
+
+
+class ScoreBoard(Screen):
+    """Score screen"""
+
+    BINDINGS = [
+        ("f3", "switch_screen('game')", "Back to game"),
+    ]
+
+    def compose(self) -> ComposeResult:
+        yield Header(show_clock=True)
+        yield Footer()
+        with Vertical(id="score_view"):
+            for player in PLAYERS:
+                yield Static(str(player.name))
+                yield Static("literki: " + str(player.get_rack_str()))
+                yield ScorePretty("Wynik: " + str(player.score))
 
 
 class HelpScreen(Screen):
     """Help screen"""
+
     BINDINGS = [
         ("escape", "app.pop_screen()", "Back"),
     ]
@@ -360,14 +701,15 @@ class HelpScreen(Screen):
 
 class GameScreen(Screen):
     """Main game screen"""
+
     BINDINGS = [
-        ("escape", "app.pop_screen()", "Back"),
+        ("f3", "switch_screen('score_board')", "Score screen"),
     ]
 
     def on_button_pressed(self, event: GameCell.Pressed):
         """Insert letter"""
-        for row in range(1, 16):
-            for col in range(1, 16):
+        for row in range(15):
+            for col in range(15):
                 if event.button.id == GameCell.at(row, col):
                     if event.button.letter == ' ':
                         event.button.letter = ACTUAL_LETTER
@@ -385,8 +727,19 @@ class GameScreen(Screen):
                     else:
                         event.button.label = event.button.letter
 
+                    if event.button.letter != ' ' and BOARD.get_board_array()[row][col] is None:
+                        BOARD.get_board_array()[row][col] = Letter(row, col, event.button.letter)
+                        ACTUAL_WORD_WITH_COORDS.append(Letter(row, col, event.button.letter))
+                    elif (event.button.letter != ' '
+                          or (event.button.letter == ' ' and BOARD.get_board_array()[row][col] is not None)):
+                        BOARD.get_board_array()[row][col] = None
+                        ACTUAL_WORD_WITH_COORDS.pop()
+                    else:
+                        pass
+
     def on_input_submitted(self, event: LetterInput.Submitted):
         """Get letter from input"""
+
         global ACTUAL_LETTER
         if event.validation_result is not None:
             if not event.validation_result.is_valid:
@@ -403,9 +756,52 @@ class GameScreen(Screen):
         with ScrollableContainer(id='app-container'):
             yield GameGrid()
             yield InformationLabel()
+        start_game()
+
+
+class MainScreen(Screen):
+    """Initial screen"""
+
+    BINDINGS = [
+        ("f3", "switch_screen('game')", "Enter game"),
+        ("f1", "add_nickname_place", "add user"),
+        ("f2", "remove_nickname_place", "remove user"),
+    ]
+
+    def compose(self) -> ComposeResult:
+        yield Header(show_clock=True)
+        yield Footer()
+        with Vertical(classes="information_container"):
+            yield Label("Witaj w grze Scrabble !", classes="information_tag")
+            yield Label("Wpisz nazwy graczy w polach. Możesz dodać więcej graczy (od 2 do 4)",
+                        classes="information_tag")
+        yield ScrollableContainer(NicknameInsertPlace(1), NicknameInsertPlace(2), id="nicknamesPlaces")
+
+    def action_add_nickname_place(self) -> None:
+        """An action to add a nickname add for other player."""
+
+        global NUMBER_OF_PLAYERS
+        if NUMBER_OF_PLAYERS < 4:
+            NUMBER_OF_PLAYERS += 1
+            new_nickname_place = NicknameInsertPlace(NUMBER_OF_PLAYERS)
+            self.query_one("#nicknamesPlaces").mount(new_nickname_place)
+            new_nickname_place.scroll_visible()
+
+    def action_remove_nickname_place(self) -> None:
+        """Called to remove a nickname place."""
+
+        global NUMBER_OF_PLAYERS, PLAYERS_NICKNAMES
+        if NUMBER_OF_PLAYERS > 2:
+            nickname_places = self.query("NicknameInsertPlace")
+            NUMBER_OF_PLAYERS = NUMBER_OF_PLAYERS - 1
+            if nickname_places:
+                nickname_places.last().remove()
+            PLAYERS_NICKNAMES[NUMBER_OF_PLAYERS] = ''
 
 
 class ScrabbleApp(App):
+    """Main app"""
+
     CSS_PATH = "scrabble.tcss"
 
     TITLE = "SCRABBLE"
@@ -414,58 +810,19 @@ class ScrabbleApp(App):
     SCREENS = {
         "help": HelpScreen(),
         "game": GameScreen(),
+        "main_screen": MainScreen(),
+        "score_board": ScoreBoard(),
     }
 
     """Shortcuts"""
     BINDINGS = [
         ("ctrl+d", "toggle_dark_mode", "Toggle dark mode"),
         ("ctrl+c", "quit", "Quit"),
-        ("f2", "push_screen('help')", "Help"),
-        ("f4", "push_screen('game')", "Enter game"),
-        ("f5", "add_nickname_place", "add user"),
-        ("f6", "remove_nickname_place", "remove user"),
+        ("f10", "push_screen('help')", "Help"),
     ]
 
-    # def on_input_submitted(self, event: PlayersCountInput.Submitted):
-    #     """Get number from input"""
-    #     global PLAYERS_COUNT
-    #     if event.validation_result is not None:
-    #         if not event.validation_result.is_valid or event.input.value is None:
-    #             pass
-    #         else:
-    #             if event.input.value == '':
-    #                 PLAYERS_COUNT = 0
-    #             else:
-    #                 PLAYERS_COUNT = event.input.value[0]
-    #             try:
-    #                 self.query_one(PlayersPretty).update(int(event.input.value[0]))
-    #             except:
-    #                 pass
-
-    def compose(self) -> ComposeResult:
-        yield Header(show_clock=True)
-        yield Footer()
-        with Horizontal(classes="information_container"):
-            yield Label("Witaj w grze Scrabble !", classes="information_tag")
-        yield ScrollableContainer(NicknameInsertPlace(1), NicknameInsertPlace(2), id="nicknamesPlaces")
-
-    def action_add_nickname_place(self) -> None:
-        """An action to add a nickname add for other player."""
-        global PLAYERS_COUNT
-        if PLAYERS_COUNT < 4:
-            PLAYERS_COUNT = PLAYERS_COUNT + 1
-            new_nickname_place = NicknameInsertPlace(PLAYERS_COUNT)
-            self.query_one("#nicknamesPlaces").mount(new_nickname_place)
-            new_nickname_place.scroll_visible()
-
-    def action_remove_nickname_place(self) -> None:
-        """Called to remove a nickname place."""
-        global PLAYERS_COUNT
-        if PLAYERS_COUNT > 2:
-            nickname_places = self.query("NicknameInsertPlace")
-            PLAYERS_COUNT = PLAYERS_COUNT - 1
-            if nickname_places:
-                nickname_places.last().remove()
+    def on_mount(self):
+        self.push_screen(MainScreen())
 
     def action_toggle_dark_mode(self):
         """Turn on / off dark mode"""

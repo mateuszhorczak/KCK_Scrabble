@@ -58,20 +58,28 @@ GameCell {
 }
 
 InformationLabel {
-    height: 5;
     dock: bottom;
-    margin-bottom: 1;
+    background: gray 10%;
+    height: 7;
+    margin: 1;
+    min-width: 60;
+    padding: 1;
 }
 
 InformationLabel Label {
     margin-bottom: 1;
     color: green;
+    text-style: bold;
+}
+
+LetterInput {
+    width: 50;
 }
 
 NicknameInsertPlace {
     margin-top: 2;
     background: $boost;
-    height: 5;
+    height: 6;
     margin: 1;
     min-width: 50;
     padding: 1;
@@ -85,4 +93,40 @@ NicknameInsertPlace {
 
 .information_tag {
     width: auto;
+}
+
+RoundNumberPretty {
+    width: auto;
+    text-style: bold;
+    margin-right: 2;
+}
+
+UserLettersPretty {
+    width: auto;
+    text-style: bold;
+}
+
+PlayerNameLabelPretty {
+    width: auto;
+    text-style: bold;
+    margin-right: 2;
+}
+
+ScorePretty {
+    width: 10;
+    height: 10;
+    text-style: bold;
+}
+
+#score_view {
+    color: green;
+    width: 20%;
+    height: auto;
+    background: gray 10%;
+    padding: 2;
+}
+
+ScoreBoard {
+    align: center middle;
+    margin: 0;
 }
