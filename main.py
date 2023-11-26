@@ -513,6 +513,8 @@ class GameCell(Button):
         self.row = row
         self.col = col
         self.letter = ' '
+        self.approved_round = 0
+        self.player = ' '
         if (row, col) in TRIPLE_LETTER_SCORE:
             super().__init__(label=f"{self.letter} : 3L", id=self.at(row, col), variant='primary')
         elif (row, col) in DOUBLE_LETTER_SCORE:
@@ -714,8 +716,12 @@ class HelpScreen(Screen):
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
         yield Footer()
-        with Horizontal(classes="information_container"):
+        with Vertical(classes="information_container"):
             yield Static("PLANSZA POMOCY", classes="information_tag")
+        with Vertical(classes="letters_values"):
+            yield Static("WARTOŚĆ LITER", classes="letter_and_values_tag")
+            for key, value in LETTER_VALUES.items():
+                yield Pretty(key + " ma wartość: " + str(value), classes="letter_and_values_tag")
 
 
 class GameScreen(Screen):
@@ -732,56 +738,68 @@ class GameScreen(Screen):
             for col in range(15):
                 if event.button.id == GameCell.at(row, col):
 
-                    if event.button.letter == ' ' and ACTUAL_LETTER != ' ':
-                        """Add letter to empty field"""
-                        user_letters = PLAYERS[get_player_index()].rack.get_rack_arr()
-                        for tile in user_letters:
-                            if tile.get_letter() == ACTUAL_LETTER:
-                                PLAYERS[get_player_index()].rack.remove_from_rack(tile)
-                                break
-                        event.button.letter = ACTUAL_LETTER
-                    elif event.button.letter != ' ' and ACTUAL_LETTER == ' ':
-                        """Remove letter to get empty field and get letter back"""
-                        PLAYERS[get_player_index()].rack.append_letter(Tile(event.button.letter))
-                        event.button.letter = ACTUAL_LETTER
-                    elif event.button.letter != ' ' and ACTUAL_LETTER != ' ':
-                        """Replace letter other letter"""
-                        user_letters = PLAYERS[get_player_index()].rack.get_rack_arr()
-                        for tile in user_letters:
-                            if tile.get_letter() == ACTUAL_LETTER:
-                                PLAYERS[get_player_index()].rack.remove_from_rack(tile)
-                                break
-                        PLAYERS[get_player_index()].rack.append_letter(Tile(event.button.letter))
-                        event.button.letter = ACTUAL_LETTER
-                    else:
-                        """Do nothing (space char to empty field)"""
-                        event.button.letter = ACTUAL_LETTER
+                    if ((event.button.approved_round == 0 or event.button.approved_round == ROUND_NUMBER)
+                        and (event.button.player == ' '
+                             or event.button.player == PLAYERS[get_player_index()].get_name())):
 
-                    """change button label"""
-                    if (row, col) in TRIPLE_LETTER_SCORE:
-                        event.button.label = f"{event.button.letter} : 3L"
-                    elif (row, col) in DOUBLE_LETTER_SCORE:
-                        event.button.label = f"{event.button.letter} : 2L"
-                    elif (row, col) in TRIPLE_WORD_SCORE:
-                        event.button.label = f"{event.button.letter} : 3W"
-                    elif (row, col) in DOUBLE_WORD_SCORE:
-                        event.button.label = f"{event.button.letter} : 2W"
-                    else:
-                        event.button.label = event.button.letter
+                        if event.button.letter == ' ' and ACTUAL_LETTER != ' ':
+                            """Add letter to empty field"""
+                            user_letters = PLAYERS[get_player_index()].rack.get_rack_arr()
+                            for tile in user_letters:
+                                if tile.get_letter() == ACTUAL_LETTER:
+                                    PLAYERS[get_player_index()].rack.remove_from_rack(tile)
+                                    break
 
-                    """insert letters to array board and actual word array"""
-                    if event.button.letter != ' ' and BOARD.get_board_array()[row][col] is None:
-                        BOARD.get_board_array()[row][col] = Letter(row, col, event.button.letter)
-                        ACTUAL_WORD_WITH_COORDS.append(Letter(row, col, event.button.letter))
-                    elif (event.button.letter != ' '
-                          or (event.button.letter == ' ' and BOARD.get_board_array()[row][col] is not None)):
-                        BOARD.get_board_array()[row][col] = None
-                        ACTUAL_WORD_WITH_COORDS.pop()
-                    else:
-                        pass
+                            event.button.approved_round = ROUND_NUMBER
+                            event.button.player = PLAYERS[get_player_index()].get_name()
+                            event.button.letter = ACTUAL_LETTER
 
-                    """reset letter after single insert to board"""
-                    ACTUAL_LETTER = ' '
+                        elif event.button.letter != ' ' and ACTUAL_LETTER == ' ':
+                            """Remove letter to get empty field and get letter back"""
+                            PLAYERS[get_player_index()].rack.append_letter(Tile(event.button.letter))
+                            event.button.approved_round = 0
+                            event.button.player = ' '
+                            event.button.letter = ACTUAL_LETTER
+
+                        elif event.button.letter != ' ' and ACTUAL_LETTER != ' ':
+                            """Replace letter other letter"""
+                            user_letters = PLAYERS[get_player_index()].rack.get_rack_arr()
+                            for tile in user_letters:
+                                if tile.get_letter() == ACTUAL_LETTER:
+                                    PLAYERS[get_player_index()].rack.remove_from_rack(tile)
+                                    break
+                            PLAYERS[get_player_index()].rack.append_letter(Tile(event.button.letter))
+                            event.button.letter = ACTUAL_LETTER
+
+                        else:
+                            """Do nothing (space char to empty field)"""
+                            event.button.letter = ACTUAL_LETTER
+
+                        """change button label"""
+                        if (row, col) in TRIPLE_LETTER_SCORE:
+                            event.button.label = f"{event.button.letter} : 3L"
+                        elif (row, col) in DOUBLE_LETTER_SCORE:
+                            event.button.label = f"{event.button.letter} : 2L"
+                        elif (row, col) in TRIPLE_WORD_SCORE:
+                            event.button.label = f"{event.button.letter} : 3W"
+                        elif (row, col) in DOUBLE_WORD_SCORE:
+                            event.button.label = f"{event.button.letter} : 2W"
+                        else:
+                            event.button.label = event.button.letter
+
+                        """insert letters to array board and actual word array"""
+                        if event.button.letter != ' ' and BOARD.get_board_array()[row][col] is None:
+                            BOARD.get_board_array()[row][col] = Letter(row, col, event.button.letter)
+                            ACTUAL_WORD_WITH_COORDS.append(Letter(row, col, event.button.letter))
+                        elif (event.button.letter != ' '
+                              or (event.button.letter == ' ' and BOARD.get_board_array()[row][col] is not None)):
+                            BOARD.get_board_array()[row][col] = None
+                            ACTUAL_WORD_WITH_COORDS.pop()
+                        else:
+                            pass
+
+                        """reset letter after single insert to board"""
+                        ACTUAL_LETTER = ' '
 
     def on_input_submitted(self, event: LetterInput.Submitted):
         """Get letter from input"""

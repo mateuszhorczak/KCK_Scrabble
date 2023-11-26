@@ -89,10 +89,14 @@ NicknameInsertPlace {
     align: center middle;
     color: green;
     height: 5;
+    padding: 1;
+    background: gray 20%;
 }
 
 .information_tag {
     width: auto;
+    margin-bottom: 1;
+    text-style: bold;
 }
 
 RoundNumberPretty {
@@ -129,4 +133,17 @@ ScorePretty {
 ScoreBoard {
     align: center middle;
     margin: 0;
+}
+
+.letters_values {
+    align: left middle;
+    color: green;
+    height: 100%;
+    background: gray 10%;
+}
+
+.letter_and_values_tag {
+    width: auto;
+    margin-bottom: 1;
+    margin-left: 1;
 }
