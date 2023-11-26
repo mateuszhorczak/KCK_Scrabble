@@ -12,8 +12,8 @@ from textual.validation import Validator, ValidationResult
 from textual.widget import Widget
 from textual.widgets import Footer, Header, Button, Digits, Static, RichLog, Input, Label, Pretty
 
-ACTUAL_SCREEN = ''
 ACTUAL_LETTER = ' '
+USED_TILES_IN_TURN = []
 
 """default number of players is 2, but can increase to 4 in app"""
 NUMBER_OF_PLAYERS = 2
@@ -154,6 +154,16 @@ class Rack:
         # Returns the rack as an array of tile instances
         return self.rack
 
+    def get_letters_from_rack_arr(self):
+        # Return the letters in array
+        arr = []
+        for item in self.rack:
+            arr.append(item.get_letter())
+        return arr
+
+    def append_letter(self, tile):
+        self.rack.append(tile)
+
     def remove_from_rack(self, tile):
         # Removes a tile from the rack (for example, when a tile is being played).
         self.rack.remove(tile)
@@ -195,6 +205,13 @@ class Player:
     def get_rack_arr(self):
         # Returns the player's rack in the form of an array.
         return self.rack.get_rack_arr()
+
+    def get_letters_from_rack_arr(self):
+        # Returns the player's letters in array
+        return self.rack.get_letters_from_rack_arr()
+
+    def append_letter(self, tile):
+        return self.rack.append_letter(tile)
 
     def increase_score(self, increase):
         # Increases the player's score by a certain amount. Takes the increase (int) as an argument and adds it to the score.
@@ -269,6 +286,16 @@ class Word:
                 word_score *= 2
 
         self.player.increase_score(word_score)
+
+
+def get_player_index():
+    player_index = ROUND_NUMBER - 1
+    while True:
+        if player_index < len(PLAYERS):
+            break
+        else:
+            player_index -= len(PLAYERS)
+    return player_index
 
 
 def turn(player, bag):
@@ -520,7 +547,11 @@ class IsALetter(Validator):
     """Check if the char is a letter"""
 
     def validate(self, value: str) -> ValidationResult:
-        if value.upper() in LETTER_VALUES.keys() or value == '':
+        player_index = get_player_index()
+        if ((value.upper() in LETTER_VALUES.keys()
+             and value.upper() in PLAYERS[player_index].get_letters_from_rack_arr())
+                or value == ''):
+
             return self.success()
         else:
             return self.failure()
@@ -569,34 +600,23 @@ class InformationLabel(Widget):
 
     @on(Button.Pressed, "#confirm_button")
     def pass_pressed(self, event: Button.Pressed):
-        global ROUND_NUMBER
+        global ROUND_NUMBER, USED_TILES_IN_TURN
         ROUND_NUMBER += 1
         self.query_one(RoundNumberPretty).update(ROUND_NUMBER)
-
-        player_index = ROUND_NUMBER - 1
-        while True:
-            if player_index < len(PLAYERS):
-                break
-            else:
-                player_index -= len(PLAYERS)
-
+        player_index = get_player_index()
         self.query_one(PlayerNameLabelPretty).update(PLAYERS[player_index].name)
         self.query_one(UserLettersPretty).update(PLAYERS[player_index].get_rack_str())
+        USED_TILES_IN_TURN = []
 
     @on(Button.Pressed, "#pass_button")
     def confirm_pressed(self, event: Button.Pressed):
-        global ROUND_NUMBER
+        global ROUND_NUMBER, USED_TILES_IN_TURN
         ROUND_NUMBER += 1
         self.query_one(RoundNumberPretty).update(ROUND_NUMBER)
-
-        player_index = ROUND_NUMBER - 1
-        while True:
-            if player_index < len(PLAYERS):
-                break
-            else:
-                player_index -= len(PLAYERS)
-
+        player_index = get_player_index()
         self.query_one(PlayerNameLabelPretty).update(PLAYERS[player_index].name)
+        self.query_one(UserLettersPretty).update(PLAYERS[player_index].get_rack_str())
+        USED_TILES_IN_TURN = []
 
 
 class UserLettersPretty(Pretty):
@@ -681,8 +701,7 @@ class ScoreBoard(Screen):
         with Vertical(id="score_view"):
             for player in PLAYERS:
                 yield Static(str(player.name))
-                yield Static("literki: " + str(player.get_rack_str()))
-                yield ScorePretty("Wynik: " + str(player.score))
+                yield ScorePretty("Wynik: " + str(player.get_score()))
 
 
 class HelpScreen(Screen):
@@ -708,14 +727,37 @@ class GameScreen(Screen):
 
     def on_button_pressed(self, event: GameCell.Pressed):
         """Insert letter"""
+        global ACTUAL_LETTER
         for row in range(15):
             for col in range(15):
                 if event.button.id == GameCell.at(row, col):
-                    if event.button.letter == ' ':
+
+                    if event.button.letter == ' ' and ACTUAL_LETTER != ' ':
+                        """Add letter to empty field"""
+                        user_letters = PLAYERS[get_player_index()].rack.get_rack_arr()
+                        for tile in user_letters:
+                            if tile.get_letter() == ACTUAL_LETTER:
+                                PLAYERS[get_player_index()].rack.remove_from_rack(tile)
+                                break
+                        event.button.letter = ACTUAL_LETTER
+                    elif event.button.letter != ' ' and ACTUAL_LETTER == ' ':
+                        """Remove letter to get empty field and get letter back"""
+                        PLAYERS[get_player_index()].rack.append_letter(Tile(event.button.letter))
+                        event.button.letter = ACTUAL_LETTER
+                    elif event.button.letter != ' ' and ACTUAL_LETTER != ' ':
+                        """Replace letter other letter"""
+                        user_letters = PLAYERS[get_player_index()].rack.get_rack_arr()
+                        for tile in user_letters:
+                            if tile.get_letter() == ACTUAL_LETTER:
+                                PLAYERS[get_player_index()].rack.remove_from_rack(tile)
+                                break
+                        PLAYERS[get_player_index()].rack.append_letter(Tile(event.button.letter))
                         event.button.letter = ACTUAL_LETTER
                     else:
-                        event.button.letter = ' '
+                        """Do nothing (space char to empty field)"""
+                        event.button.letter = ACTUAL_LETTER
 
+                    """change button label"""
                     if (row, col) in TRIPLE_LETTER_SCORE:
                         event.button.label = f"{event.button.letter} : 3L"
                     elif (row, col) in DOUBLE_LETTER_SCORE:
@@ -727,6 +769,7 @@ class GameScreen(Screen):
                     else:
                         event.button.label = event.button.letter
 
+                    """insert letters to array board and actual word array"""
                     if event.button.letter != ' ' and BOARD.get_board_array()[row][col] is None:
                         BOARD.get_board_array()[row][col] = Letter(row, col, event.button.letter)
                         ACTUAL_WORD_WITH_COORDS.append(Letter(row, col, event.button.letter))
@@ -736,6 +779,9 @@ class GameScreen(Screen):
                         ACTUAL_WORD_WITH_COORDS.pop()
                     else:
                         pass
+
+                    """reset letter after single insert to board"""
+                    ACTUAL_LETTER = ' '
 
     def on_input_submitted(self, event: LetterInput.Submitted):
         """Get letter from input"""
