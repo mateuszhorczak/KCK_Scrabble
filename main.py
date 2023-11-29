@@ -13,7 +13,6 @@ from textual.widget import Widget
 from textual.widgets import Footer, Header, Button, Digits, Static, RichLog, Input, Label, Pretty
 
 ACTUAL_LETTER = ' '
-USED_TILES_IN_TURN = []
 
 """default number of players is 2, but can increase to 4 in app"""
 NUMBER_OF_PLAYERS = 2
@@ -22,11 +21,13 @@ PLAYERS_NICKNAMES = ['', '', '', '']
 ROUND_NUMBER = 1
 SKIPPED_TURNS = 0
 ACTUAL_WORD_WITH_COORDS = []
+PLAYED_WORDS = []
 BOARD = None
+BAG = None
 DICTIONARY = None
 
 LETTER_VALUES = {
-    "A": 1, "B": 3, "C": 3, "D": 2, "E": 1, "F": 4, "G": 2, "H": 4, "I": 1, "J": 1, "K": 5, "L": 1,
+    "A": 1, "B": 3, "C": 3, "D": 2, "E": 1, "F": 4, "G": 2, "H": 4, "I": 1, "J": 8, "K": 5, "L": 1,
     "M": 3, "N": 1, "O": 1, "P": 3, "Q": 10, "R": 1, "S": 1, "T": 1, "U": 1, "V": 4, "W": 4, "X": 8,
     "Y": 4, "Z": 10
 }
@@ -48,16 +49,16 @@ DOUBLE_LETTER_SCORE = [
 
 
 class Letter:
-    def __init__(self, x, y, value):
-        self.x = x
+    def __init__(self, y, x, value):
         self.y = y
+        self.x = x
         self.value = value
-
-    def get_x(self):
-        return self.x
 
     def get_y(self):
         return self.y
+
+    def get_x(self):
+        return self.x
 
     def get_value(self):
         return self.value
@@ -89,7 +90,7 @@ class Bag:
 
     def initialize_bag(self):
         global LETTER_VALUES
-        self.add_to_bag(Tile("A"), 10)
+        self.add_to_bag(Tile("A"), 9)
         self.add_to_bag(Tile("B"), 2)
         self.add_to_bag(Tile("C"), 2)
         self.add_to_bag(Tile("D"), 4)
@@ -98,10 +99,10 @@ class Bag:
         self.add_to_bag(Tile("G"), 3)
         self.add_to_bag(Tile("H"), 2)
         self.add_to_bag(Tile("I"), 9)
-        self.add_to_bag(Tile("J"), 9)
-        self.add_to_bag(Tile("K"), 2)
+        self.add_to_bag(Tile("J"), 1)
+        self.add_to_bag(Tile("K"), 1)
         self.add_to_bag(Tile("L"), 4)
-        self.add_to_bag(Tile("M"), 2)
+        self.add_to_bag(Tile("M"), 3)
         self.add_to_bag(Tile("N"), 6)
         self.add_to_bag(Tile("O"), 8)
         self.add_to_bag(Tile("P"), 2)
@@ -114,7 +115,7 @@ class Bag:
         self.add_to_bag(Tile("W"), 2)
         self.add_to_bag(Tile("X"), 1)
         self.add_to_bag(Tile("Y"), 2)
-        self.add_to_bag(Tile("Z"), 1)
+        self.add_to_bag(Tile("Z"), 2)
         shuffle(self.bag)
 
     def take_from_bag(self):
@@ -247,12 +248,13 @@ class Word:
         if DICTIONARY is None:
             DICTIONARY = open("dic.txt").read().splitlines()
 
-        """if invalid word"""
+        """If word not in dictionary"""
         if self.word not in DICTIONARY:
-            return "Invalid word, not in dictionary"
+            return False
 
+        """If player use other word to create his word"""
         if not self.used_other_word and ROUND_NUMBER != 1:
-            return "After first round you must use other word to create your word!!"
+            return False
 
         if ROUND_NUMBER == 1:
             contains_start_field = False
@@ -260,32 +262,39 @@ class Word:
                 if letter.get_x() == 7 and letter.get_y() == 7:
                     contains_start_field = True
 
+            """If word contains start field (8, 8)"""
             if not contains_start_field:
-                return "At first round you must use start field: 8:8"
+                return False
 
-        return "Valid word"
+        return True
 
     def calculate_word_score(self):
         global LETTER_VALUES, TRIPLE_WORD_SCORE, DOUBLE_WORD_SCORE, TRIPLE_LETTER_SCORE, DOUBLE_LETTER_SCORE
         word_score = 0
 
+        """"""
+
         """If letter place in letter premium spot"""
         for letter in ACTUAL_WORD_WITH_COORDS:
-            if (letter.get_x(), letter.get_y()) in TRIPLE_LETTER_SCORE:
+            if (letter.get_y(), letter.get_x()) in TRIPLE_LETTER_SCORE:
                 word_score += LETTER_VALUES[letter.get_value()] * 3
 
-            if (letter.get_x(), letter.get_y()) in DOUBLE_LETTER_SCORE:
+            elif (letter.get_y(), letter.get_x()) in DOUBLE_LETTER_SCORE:
                 word_score += LETTER_VALUES[letter.get_value()] * 2
+
+            else:
+                word_score += LETTER_VALUES[letter.get_value()]
 
         """If letter place in word premium spot"""
         for letter in ACTUAL_WORD_WITH_COORDS:
-            if (letter.get_x(), letter.get_y()) in TRIPLE_WORD_SCORE:
+            if (letter.get_y(), letter.get_x()) in TRIPLE_WORD_SCORE:
                 word_score *= 3
 
-            if (letter.get_x(), letter.get_y()) in DOUBLE_WORD_SCORE:
+            if (letter.get_y(), letter.get_x()) in DOUBLE_WORD_SCORE:
                 word_score *= 2
 
         self.player.increase_score(word_score)
+        return word_score
 
 
 def get_player_index():
@@ -298,36 +307,89 @@ def get_player_index():
     return player_index
 
 
-def turn(player, bag):
-    global ROUND_NUMBER, SKIPPED_TURNS, ACTUAL_WORD_WITH_COORDS, BOARD
+def start_game():
+    """Function that start the game"""
+    global PLAYERS, NUMBER_OF_PLAYERS, PLAYERS_NICKNAMES, BOARD, BAG
+    BOARD = Board()
+    BAG = Bag()
+    for i in range(NUMBER_OF_PLAYERS):
+        PLAYERS.append(Player(BAG))
+        PLAYERS[i].set_name(PLAYERS_NICKNAMES[i])
+
+
+def turn(player):   # TODO check returns
+    global ROUND_NUMBER, SKIPPED_TURNS, ACTUAL_WORD_WITH_COORDS, BOARD, BAG
     """if is true direction of word is horizontal, else direction is vertical"""
     direction_horizontal = True
     used_other_word = False
     word_to_play = ''
 
-    if (SKIPPED_TURNS < 6) or (player.rack.get_rack_length() == 0 and bag.get_remaining_tiles() == 0):
+    if not ACTUAL_WORD_WITH_COORDS:
+        return 0
+
+    if (SKIPPED_TURNS < 6) or (player.rack.get_rack_length() == 0 and BAG.get_remaining_tiles() == 0):
+
+        """if user place only one letter and attach to board letters"""
+        if len(ACTUAL_WORD_WITH_COORDS) == 1:
+            y = ACTUAL_WORD_WITH_COORDS[0].get_y()
+            x = ACTUAL_WORD_WITH_COORDS[0].get_x()
+            if_get_letter = False
+            
+            if y != 14 and not if_get_letter:
+                if BOARD.get_board_array()[y + 1][x] is not None:
+                    """If connect to the letter on the top"""
+                    ACTUAL_WORD_WITH_COORDS.append(BOARD.get_board_array()[y + 1][x])
+                    if_get_letter = True
+            if y != 0 and not if_get_letter:
+                if BOARD.get_board_array()[y - 1][x] is not None:
+                    """If connect to the letter on the bottom"""
+                    ACTUAL_WORD_WITH_COORDS.append(BOARD.get_board_array()[y - 1][x])
+                    if_get_letter = True
+            if x != 14 and not if_get_letter:
+                if BOARD.get_board_array()[y][x + 1] is not None:
+                    """If connect to the letter on the right"""
+                    ACTUAL_WORD_WITH_COORDS.append(BOARD.get_board_array()[y][x + 1])
+                    """If connect to the letter on the left"""
+                    if_get_letter = True
+            if x != 0 and not if_get_letter:
+                if BOARD.get_board_array()[y][x - 1] is not None:
+                    ACTUAL_WORD_WITH_COORDS.append(BOARD.get_board_array()[y][x - 1])
+                    if_get_letter = True
+            if not if_get_letter:
+                """The letter doesn't connect with anything"""
+                return 0
+    
+
         if ACTUAL_WORD_WITH_COORDS[0].get_x() == ACTUAL_WORD_WITH_COORDS[1].get_x():
             direction_horizontal = False
         elif ACTUAL_WORD_WITH_COORDS[0].get_y() == ACTUAL_WORD_WITH_COORDS[1].get_y():
             direction_horizontal = True
         else:
             """not valid word"""
-            return
+            return 0
 
         if direction_horizontal:
+            """word in horizontal direction"""
+
             """Sort letters by x-coordinate"""
             ACTUAL_WORD_WITH_COORDS.sort(key=lambda letter: letter.get_x())
             row_number = ACTUAL_WORD_WITH_COORDS[0].get_y()
 
+            temp_actual_word_with_coords = ACTUAL_WORD_WITH_COORDS.copy()
             """Check if letters that user placed stand next to each other"""
-            for letter_in_word, l in enumerate(ACTUAL_WORD_WITH_COORDS):
+            for l, letter_in_word in enumerate(temp_actual_word_with_coords):
 
-                """If they are not next to each other, check if the user used a letter that is already on the board"""
-                if (letter_in_word.get_x() != ACTUAL_WORD_WITH_COORDS[l + 1].get_x()
-                        and letter_in_word.get_x() < ACTUAL_WORD_WITH_COORDS[l + 1].get_x()):
+                """if it is a last user letter"""
+                if l == len(temp_actual_word_with_coords) - 1:
+                    word_to_play += letter_in_word.get_value()
+
+                elif letter_in_word.get_x() + 1 != ACTUAL_WORD_WITH_COORDS[l + 1].get_x():
+                    """
+                    If they are not next to each other, check if the user used a letter that is already on the board
+                    """
 
                     index_before_break = letter_in_word.get_x()
-                    index_after_break = ACTUAL_WORD_WITH_COORDS[l + 1].get_x()
+                    index_after_break = temp_actual_word_with_coords[l + 1].get_x()
 
                     """Iterates over a break"""
                     break_letters = ''
@@ -336,156 +398,161 @@ def turn(player, bag):
                         """Check if something place in break is between letters"""
                         if BOARD.get_board_array()[row_number][j] is not None:
                             break_letters += BOARD.get_board_array()[row_number][j].get_value()
+                            ACTUAL_WORD_WITH_COORDS.append(
+                                Letter(row_number, j, BOARD.get_board_array()[row_number][j].get_value())
+                            )
                         else:
-                            """Lack of continuity. INVALID WORD"""  # TODO check
-                            return
+                            """Lack of continuity. INVALID WORD"""
+                            return 0
 
                     """Combine user letters with letters on the board"""
                     new_word = word_to_play + break_letters + letter_in_word.get_value()
                     word_to_play = new_word
                     used_other_word = True
 
-                    """if it is a last user letter"""
-                elif not letter_in_word.get_x() < ACTUAL_WORD_WITH_COORDS[l + 1].get_x():
-                    word_to_play += letter_in_word.get_value()
 
                     """letter is not last and dont have break, common case"""
                 else:
                     word_to_play += letter_in_word.get_value()
 
             """Check if user used letters from board at start or end of his word"""
-            first_coordinate = ACTUAL_WORD_WITH_COORDS[0].get_x()
-            last_coordinate = ACTUAL_WORD_WITH_COORDS[-1].get_x()
+            first_coordinate = temp_actual_word_with_coords[0].get_x()
+            last_coordinate = temp_actual_word_with_coords[-1].get_x()
 
             """if additional letter at start of his word"""
-            i = 0
-            while True:
-                if BOARD.get_board_array()[row_number][first_coordinate - i] is not None:
-                    word_to_play = BOARD.get_board_array()[row_number][first_coordinate - i].get_value() + word_to_play
-                    ACTUAL_WORD_WITH_COORDS.append(
-                        Letter(
-                            row_number,
-                            first_coordinate - i,
-                            BOARD.get_board_array()[row_number][first_coordinate - i]
+            i = 1
+            if first_coordinate > 0:
+                while True:
+                    if BOARD.get_board_array()[row_number][first_coordinate - i] is not None:
+                        word_to_play = BOARD.get_board_array()[row_number][first_coordinate - i].get_value() + word_to_play
+                        ACTUAL_WORD_WITH_COORDS.append(
+                            Letter(
+                                row_number,
+                                first_coordinate - i,
+                                BOARD.get_board_array()[row_number][first_coordinate - i].get_value()
+                            )
                         )
-                    )
-                    used_other_word = True
-                    i += 1
-                else:
-                    break
+                        used_other_word = True
+                        i += 1
+                    else:
+                        break
 
             """If additional letter at end of his word"""
-            i = 0
-            while True:
-                if BOARD.get_board_array()[row_number][last_coordinate + i] is not None:
-                    word_to_play = word_to_play + BOARD.get_board_array()[row_number][last_coordinate + i].get_value()
+            i = 1
+            if last_coordinate < 14:
+                while True:
+                    if BOARD.get_board_array()[row_number][last_coordinate + i] is not None:
+                        word_to_play = word_to_play + BOARD.get_board_array()[row_number][last_coordinate + i].get_value()
 
-                    ACTUAL_WORD_WITH_COORDS.append(
-                        Letter(
-                            row_number,
-                            last_coordinate + i,
-                            BOARD.get_board_array()[row_number][last_coordinate + i]
+                        ACTUAL_WORD_WITH_COORDS.append(
+                            Letter(
+                                row_number,
+                                last_coordinate + i,
+                                BOARD.get_board_array()[row_number][last_coordinate + i].get_value()
+                            )
                         )
-                    )
-                    used_other_word = True
-                    i += 1
-                else:
-                    break
-            ACTUAL_WORD_WITH_COORDS.sort(key=lambda letter: letter.get_x())
+                        used_other_word = True
+                        i += 1
+                    else:
+                        break
+                ACTUAL_WORD_WITH_COORDS.sort(key=lambda letter: letter.get_x())
 
         else:
+            """word in vertical direction"""
+
             """Sort letters by y-coordinate"""
             ACTUAL_WORD_WITH_COORDS.sort(key=lambda letter: letter.get_y())
             col_number = ACTUAL_WORD_WITH_COORDS[0].get_x()
 
+            temp_actual_word_with_coords = ACTUAL_WORD_WITH_COORDS.copy()
             """Check if letters that user placed stand next to each other"""
-            for letter_in_word, l in enumerate(ACTUAL_WORD_WITH_COORDS):
+            for l, letter_in_word in enumerate(temp_actual_word_with_coords):
 
-                """If they are not next to each other, check if the user used a letter that is already on the board"""
-                if (letter_in_word.get_y() != ACTUAL_WORD_WITH_COORDS[l + 1].get_y()
-                        and letter_in_word.get_y() < ACTUAL_WORD_WITH_COORDS[l + 1].get_y()):
+                """if it is a last user letter"""
+                if l == len(temp_actual_word_with_coords) - 1:
+                    word_to_play += letter_in_word.get_value()
+
+                elif letter_in_word.get_y() + 1 != temp_actual_word_with_coords[l + 1].get_y():
+                    """
+                    If they are not next to each other, check if the user used a letter that is already on the board
+                    """
 
                     index_before_break = letter_in_word.get_y()
-                    index_after_break = ACTUAL_WORD_WITH_COORDS[l + 1].get_y()
+                    index_after_break = temp_actual_word_with_coords[l + 1].get_y()
 
                     """Iterates over a break"""
                     break_letters = ''
                     for j in range(index_before_break + 1, index_after_break):
 
                         """Check if something place in break is between letters"""
-                        if BOARD.get_board_array()[col_number][j] is not None:
-                            break_letters += BOARD.get_board_array()[col_number][j].get_value()
+                        if BOARD.get_board_array()[j][col_number] is not None:
+                            break_letters += BOARD.get_board_array()[j][col_number].get_value()
+                            ACTUAL_WORD_WITH_COORDS.append(
+                                Letter(j, col_number, BOARD.get_board_array()[j][col_number].get_value())
+                            )
                         else:
                             """Lack of continuity. INVALID WORD"""  # TODO check
-                            return
+                            return 0
 
                     """Combine user letters with letters on the board"""
                     new_word = word_to_play + break_letters + letter_in_word.get_value()
                     word_to_play = new_word
                     used_other_word = True
 
-                    """if it is a last user letter"""
-                elif not letter_in_word.get_y() < ACTUAL_WORD_WITH_COORDS[l + 1].get_y():
-                    word_to_play += letter_in_word.get_value()
 
                     """letter is not last and dont have break, common case"""
                 else:
                     word_to_play += letter_in_word.get_value()
 
             """Check if user used letters from board at start or end of his word"""
-            first_coordinate = ACTUAL_WORD_WITH_COORDS[0].get_y()
-            last_coordinate = ACTUAL_WORD_WITH_COORDS[-1].get_y()
+            first_coordinate = temp_actual_word_with_coords[0].get_y()
+            last_coordinate = temp_actual_word_with_coords[-1].get_y()
 
             """if additional letter at start of his word"""
-            i = 0
-            while True:
-                if BOARD.get_board_array()[first_coordinate - i][col_number] is not None:
-                    word_to_play = BOARD.get_board_array()[first_coordinate - i][col_number].get_value() + word_to_play
-                    ACTUAL_WORD_WITH_COORDS.append(
-                        Letter(
-                            first_coordinate - i,
-                            col_number,
-                            BOARD.get_board_array()[first_coordinate - i][col_number]
+            i = 1
+            if first_coordinate > 0:
+                while True:
+                    if BOARD.get_board_array()[first_coordinate - i][col_number] is not None:
+                        word_to_play = BOARD.get_board_array()[first_coordinate - i][col_number].get_value() + word_to_play
+                        ACTUAL_WORD_WITH_COORDS.append(
+                            Letter(
+                                first_coordinate - i,
+                                col_number,
+                                BOARD.get_board_array()[first_coordinate - i][col_number].get_value()
+                            )
                         )
-                    )
-                    used_other_word = True
-                    i += 1
-                else:
-                    break
+                        used_other_word = True
+                        i += 1
+                    else:
+                        break
 
             """If additional letter at end of his word"""
-            i = 0
-            while True:
-                if BOARD.get_board_array()[last_coordinate + i][col_number] is not None:
-                    word_to_play = word_to_play + BOARD.get_board_array()[last_coordinate + i][col_number].get_value()
-                    ACTUAL_WORD_WITH_COORDS.append(
-                        Letter(
-                            last_coordinate + i,
-                            col_number,
-                            BOARD.get_board_array()[last_coordinate + i][col_number]
+            i = 1
+            if last_coordinate < 14:
+                while True:
+                    if BOARD.get_board_array()[last_coordinate + i][col_number] is not None:
+                        word_to_play = word_to_play + BOARD.get_board_array()[last_coordinate + i][col_number].get_value()
+                        ACTUAL_WORD_WITH_COORDS.append(
+                            Letter(
+                                last_coordinate + i,
+                                col_number,
+                                BOARD.get_board_array()[last_coordinate + i][col_number].get_value()
+                            )
                         )
-                    )
-                    used_other_word = True
-                    i += 1
-                else:
-                    break
+                        used_other_word = True
+                        i += 1
+                    else:
+                        break
             ACTUAL_WORD_WITH_COORDS.sort(key=lambda letter: letter.get_y())
 
+        """Initialize word"""
         word = Word(player, word_to_play, used_other_word)
 
-
-def start_game():
-    """Function that start the game"""
-    global PLAYERS, NUMBER_OF_PLAYERS, PLAYERS_NICKNAMES, BOARD
-    for i in range(NUMBER_OF_PLAYERS):
-        PLAYERS.append(Player(Bag()))
-        PLAYERS[i].set_name(PLAYERS_NICKNAMES[i])
-
-    BOARD = Board()
-    bag = Bag()
-
-    current_player = PLAYERS[0]
-    # turn(current_player, bag)
+        """If word is correct then points are added"""
+        if word.check_words():
+            word_score = word.calculate_word_score()
+            return word_score
+        return 0
 
 
 class IsANumberOfPlayers(Validator):
@@ -599,26 +666,82 @@ class InformationLabel(Widget):
                 yield LetterInput()
                 yield Button(label="Zatwierdź ruch", variant="success", id="confirm_button")
                 yield Button(label="Pomiń turę", variant="warning", id="pass_button")
+                yield Button(label="Podnieś swoje litery", variant="primary", id="pick_up_letters")
+                yield Button(label="Zakończ grę", variant="error", id="end_game")
 
     @on(Button.Pressed, "#confirm_button")
-    def pass_pressed(self, event: Button.Pressed):
-        global ROUND_NUMBER, USED_TILES_IN_TURN
+    def confirm_pressed(self, event: Button.Pressed):
+        global ROUND_NUMBER, ACTUAL_WORD_WITH_COORDS, PLAYED_WORDS, PLAYERS
+        word_score = turn(PLAYERS[get_player_index()])
+        if word_score > 0:
+            PLAYED_WORDS.append([ACTUAL_WORD_WITH_COORDS, PLAYERS[get_player_index()], word_score])
+        else:
+            self.clear_bad_letters()
+
+        """Check if this is the last round"""
+        self.if_end_game()
+
+        """Reset word array"""
+        ACTUAL_WORD_WITH_COORDS = []
+
+        PLAYERS[get_player_index()].rack.replenish_rack()
         ROUND_NUMBER += 1
         self.query_one(RoundNumberPretty).update(ROUND_NUMBER)
         player_index = get_player_index()
         self.query_one(PlayerNameLabelPretty).update(PLAYERS[player_index].name)
         self.query_one(UserLettersPretty).update(PLAYERS[player_index].get_rack_str())
-        USED_TILES_IN_TURN = []
 
     @on(Button.Pressed, "#pass_button")
-    def confirm_pressed(self, event: Button.Pressed):
-        global ROUND_NUMBER, USED_TILES_IN_TURN
+    def pass_pressed(self, event: Button.Pressed):
+        global ROUND_NUMBER, SKIPPED_TURNS, ACTUAL_WORD_WITH_COORDS
+        self.clear_bad_letters()
         ROUND_NUMBER += 1
+        SKIPPED_TURNS += 1
+
+        """Check if this is the last round"""
+        self.if_end_game()
+
+        """Reset word array"""
+        ACTUAL_WORD_WITH_COORDS = []
+        
         self.query_one(RoundNumberPretty).update(ROUND_NUMBER)
         player_index = get_player_index()
         self.query_one(PlayerNameLabelPretty).update(PLAYERS[player_index].name)
         self.query_one(UserLettersPretty).update(PLAYERS[player_index].get_rack_str())
-        USED_TILES_IN_TURN = []
+
+    @on(Button.Pressed, "#pick_up_letters")
+    def pick_up_pressed(self, event: Button.Pressed):
+        self.clear_bad_letters()
+
+    @on(Button.Pressed, "#end_game")
+    def end_pressed(self, event: Button.Pressed):
+        self.app.switch_screen("end_screen")
+
+    def if_end_game(self):  # TODO check if works
+        if not (SKIPPED_TURNS < 6) or (PLAYERS[get_player_index()].rack.get_rack_length() == 0 and BAG.get_remaining_tiles() == 0):
+            self.app.switch_screen("end_screen")
+
+    def clear_bad_letters(self):
+        for row in range(15):
+            for col in range(15):
+                if self.app.query_one(f"#{GameCell.at(row, col)}").approved_round == ROUND_NUMBER:
+                    PLAYERS[get_player_index()].rack.append_letter(Tile(BOARD.get_board_array()[row][col].get_value()))
+                    BOARD.get_board_array()[row][col] = None
+                    self.app.query_one(f"#{GameCell.at(row, col)}").letter = ' '
+                    self.app.query_one(f"#{GameCell.at(row, col)}").approved_round = 0
+                    self.app.query_one(f"#{GameCell.at(row, col)}").player = ' '
+
+                    """change button label"""
+                    if (row, col) in TRIPLE_LETTER_SCORE:
+                        self.app.query_one(f"#{GameCell.at(row, col)}").label = " : 3L"
+                    elif (row, col) in DOUBLE_LETTER_SCORE:
+                        self.app.query_one(f"#{GameCell.at(row, col)}").label = " : 2L"
+                    elif (row, col) in TRIPLE_WORD_SCORE:
+                        self.app.query_one(f"#{GameCell.at(row, col)}").label = " : 3W"
+                    elif (row, col) in DOUBLE_WORD_SCORE:
+                        self.app.query_one(f"#{GameCell.at(row, col)}").label = " : 2W"
+                    else:
+                        self.app.query_one(f"#{GameCell.at(row, col)}").label = " "
 
 
 class UserLettersPretty(Pretty):
@@ -647,12 +770,12 @@ class PlayerNamePretty(Pretty):
 
     def __init__(self, object: Any):
         super().__init__(object)
-        
+
 
 class ScorePretty(Pretty):
     """Field displaying the score"""
-    def __init__(self, object: Any):
-        super().__init__(object)
+    def __init__(self, object: Any, label):
+        super().__init__(object, id=label)
 
 
 class NicknameInsertPlace(Widget):
@@ -690,6 +813,35 @@ class NicknameInsertPlace(Widget):
                     pass
 
 
+class EndScreen(Screen):
+    """End screen"""
+    def compose(self) -> ComposeResult:
+        yield Header(show_clock=True)
+        yield Footer()
+        with Vertical(id="score_view"):
+            global PLAYED_WORDS
+            for i, player in enumerate(PLAYERS):
+                yield Static(str(player.name))
+                yield ScorePretty("Wynik: " + str(player.get_score()), "score" + str(i))
+
+        with Vertical(id="word_view"):
+            for word in PLAYED_WORDS:
+                word_with_coords = word[0]
+                word_str = ''
+                for letter in word_with_coords:
+                    word_str += letter.get_value()
+                player = word[1]
+                word_score = word[2]
+                yield Static(str(player.name) + " słowo: " + word_str + " wartość: " + str(word_score))
+
+        # yield Button(label="Odśwież wyniki", variant="primary", id="refresh_score")
+
+    # @on(Button.Pressed, "#refresh_score")
+    # def pass_pressed(self, event: Button.Pressed):
+    #     for i, player in enumerate(PLAYERS):
+    #         self.query_one("#score" + str(i)).update("Wynik: " + str(player.get_score()))
+
+
 class ScoreBoard(Screen):
     """Score screen"""
 
@@ -701,9 +853,15 @@ class ScoreBoard(Screen):
         yield Header(show_clock=True)
         yield Footer()
         with Vertical(id="score_view"):
-            for player in PLAYERS:
+            for i, player in enumerate(PLAYERS):
                 yield Static(str(player.name))
-                yield ScorePretty("Wynik: " + str(player.get_score()))
+                yield ScorePretty("Wynik: " + str(player.get_score()), "score" + str(i))
+        yield Button(label="Odśwież wyniki", variant="primary", id="refresh_score")
+
+    @on(Button.Pressed, "#refresh_score")
+    def pass_pressed(self, event: Button.Pressed):
+        for i, player in enumerate(PLAYERS):
+            self.query_one("#score" + str(i)).update("Wynik: " + str(player.get_score()))
 
 
 class HelpScreen(Screen):
@@ -734,6 +892,7 @@ class GameScreen(Screen):
     def on_button_pressed(self, event: GameCell.Pressed):
         """Insert letter"""
         global ACTUAL_LETTER
+
         for row in range(15):
             for col in range(15):
                 if event.button.id == GameCell.at(row, col):
@@ -876,6 +1035,7 @@ class ScrabbleApp(App):
         "game": GameScreen(),
         "main_screen": MainScreen(),
         "score_board": ScoreBoard(),
+        "end_screen": EndScreen(),
     }
 
     """Shortcuts"""

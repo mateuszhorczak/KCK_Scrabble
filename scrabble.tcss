@@ -124,10 +124,22 @@ ScorePretty {
 
 #score_view {
     color: green;
-    width: 20%;
+    width: 30%;
     height: auto;
-    background: gray 10%;
+    background: gray 20%;
     padding: 2;
+    margin-left: 20;
+}
+
+#word_view {
+    color: green;
+    width: 30%;
+    height: auto;
+    background: gray 20%;
+    padding: 2;
+    dock: right;
+    margin-top: 1;
+    margin-right: 20;
 }
 
 ScoreBoard {
