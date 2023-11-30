@@ -1,3 +1,4 @@
+import json
 from random import shuffle
 from typing import Any
 
@@ -253,14 +254,13 @@ class Word:
             return False
 
         """If player use other word to create his word"""
-        if not self.used_other_word and ROUND_NUMBER != 1:
+        if not self.used_other_word and BOARD.get_board_array()[7][7] is None:
             return False
 
-        if ROUND_NUMBER == 1:
+        if BOARD.get_board_array()[7][7] is None:
             contains_start_field = False
-            for letter in ACTUAL_WORD_WITH_COORDS:
-                if letter.get_x() == 7 and letter.get_y() == 7:
-                    contains_start_field = True
+        else:
+            contains_start_field = True
 
             """If word contains start field (8, 8)"""
             if not contains_start_field:
@@ -271,8 +271,6 @@ class Word:
     def calculate_word_score(self):
         global LETTER_VALUES, TRIPLE_WORD_SCORE, DOUBLE_WORD_SCORE, TRIPLE_LETTER_SCORE, DOUBLE_LETTER_SCORE
         word_score = 0
-
-        """"""
 
         """If letter place in letter premium spot"""
         for letter in ACTUAL_WORD_WITH_COORDS:
@@ -317,12 +315,16 @@ def start_game():
         PLAYERS[i].set_name(PLAYERS_NICKNAMES[i])
 
 
-def turn(player):   # TODO check returns
+def turn(player):
     global ROUND_NUMBER, SKIPPED_TURNS, ACTUAL_WORD_WITH_COORDS, BOARD, BAG
     """if is true direction of word is horizontal, else direction is vertical"""
     direction_horizontal = True
     used_other_word = False
     word_to_play = ''
+    temp_actual_word_with_coords = ''
+    new_word = ''
+    break_letters = ''
+
 
     if not ACTUAL_WORD_WITH_COORDS:
         return 0
@@ -358,7 +360,6 @@ def turn(player):   # TODO check returns
             if not if_get_letter:
                 """The letter doesn't connect with anything"""
                 return 0
-    
 
         if ACTUAL_WORD_WITH_COORDS[0].get_x() == ACTUAL_WORD_WITH_COORDS[1].get_x():
             direction_horizontal = False
@@ -367,6 +368,18 @@ def turn(player):   # TODO check returns
         else:
             """not valid word"""
             return 0
+
+        """Check all letters if they are in one line"""
+        if direction_horizontal:
+            row_num = ACTUAL_WORD_WITH_COORDS[0].get_y()
+            for letter in ACTUAL_WORD_WITH_COORDS:
+                if not letter.get_y() == row_num:
+                    return 0
+        else:
+            col_num = ACTUAL_WORD_WITH_COORDS[0].get_x()
+            for letter in ACTUAL_WORD_WITH_COORDS:
+                if not letter.get_x() == col_num:
+                    return 0
 
         if direction_horizontal:
             """word in horizontal direction"""
@@ -673,16 +686,17 @@ class InformationLabel(Widget):
     def confirm_pressed(self, event: Button.Pressed):
         global ROUND_NUMBER, ACTUAL_WORD_WITH_COORDS, PLAYED_WORDS, PLAYERS
         word_score = turn(PLAYERS[get_player_index()])
+
         if word_score > 0:
             PLAYED_WORDS.append([ACTUAL_WORD_WITH_COORDS, PLAYERS[get_player_index()], word_score])
         else:
             self.clear_bad_letters()
 
-        """Check if this is the last round"""
-        self.if_end_game()
-
         """Reset word array"""
         ACTUAL_WORD_WITH_COORDS = []
+
+        """Check if this is the last round"""
+        self.if_end_game()
 
         PLAYERS[get_player_index()].rack.replenish_rack()
         ROUND_NUMBER += 1
@@ -717,7 +731,7 @@ class InformationLabel(Widget):
     def end_pressed(self, event: Button.Pressed):
         self.app.switch_screen("end_screen")
 
-    def if_end_game(self):  # TODO check if works
+    def if_end_game(self):
         if not (SKIPPED_TURNS < 6) or (PLAYERS[get_player_index()].rack.get_rack_length() == 0 and BAG.get_remaining_tiles() == 0):
             self.app.switch_screen("end_screen")
 
@@ -818,28 +832,33 @@ class EndScreen(Screen):
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
         yield Footer()
-        with Vertical(id="score_view"):
-            global PLAYED_WORDS
-            for i, player in enumerate(PLAYERS):
-                yield Static(str(player.name))
-                yield ScorePretty("Wynik: " + str(player.get_score()), "score" + str(i))
+        with ScrollableContainer(id="end_game_container"):
+            with Vertical(id="score_view2"):
+                global PLAYED_WORDS
+                for i, player in enumerate(PLAYERS):
+                    yield Static(str(player.name))
+                    yield ScorePretty("Wynik: " + str(player.get_score()), "score" + str(i))
 
-        with Vertical(id="word_view"):
-            for word in PLAYED_WORDS:
-                word_with_coords = word[0]
-                word_str = ''
-                for letter in word_with_coords:
-                    word_str += letter.get_value()
-                player = word[1]
-                word_score = word[2]
-                yield Static(str(player.name) + " słowo: " + word_str + " wartość: " + str(word_score))
+            with Vertical(id="word_view"):
+                for word in PLAYED_WORDS:
+                    word_with_coords = word[0]
+                    word_str = ''
+                    for letter in word_with_coords:
+                        word_str += letter.get_value()
+                    player = word[1]
+                    word_score = word[2]
+                    yield Static(str(player.name) + " słowo: " + word_str + " wartość: " + str(word_score))
 
-        # yield Button(label="Odśwież wyniki", variant="primary", id="refresh_score")
 
-    # @on(Button.Pressed, "#refresh_score")
-    # def pass_pressed(self, event: Button.Pressed):
-    #     for i, player in enumerate(PLAYERS):
-    #         self.query_one("#score" + str(i)).update("Wynik: " + str(player.get_score()))
+                # b = BOARD.get_board_array()
+                # for i in range(15):
+                #     yield Pretty(
+                    #     f"{b[i][0].get_value()} {b[i][1].get_value()} {b[i][2].get_value()} "
+                    #     f"{b[i][3].get_value()} {b[i][4].get_value()} {b[i][5].get_value()} "
+                    #     f"{b[i][6].get_value()} {b[i][7].get_value()} {b[i][8].get_value()} "
+                    #     f"{b[i][9].get_value()} {b[i][10].get_value()} {b[i][11].get_value()} "
+                    #     f"{b[i][12].get_value()} {b[i][13].get_value()} {b[i][14].get_value()} "
+                    #              )
 
 
 class ScoreBoard(Screen):
@@ -876,10 +895,22 @@ class HelpScreen(Screen):
         yield Footer()
         with Vertical(classes="information_container"):
             yield Static("PLANSZA POMOCY", classes="information_tag")
-        with Vertical(classes="letters_values"):
-            yield Static("WARTOŚĆ LITER", classes="letter_and_values_tag")
-            for key, value in LETTER_VALUES.items():
-                yield Pretty(key + " ma wartość: " + str(value), classes="letter_and_values_tag")
+        with Horizontal(id="help_labels"):
+            with Vertical(classes="letters_values"):
+                yield Static("WARTOŚĆ LITER", classes="letter_and_values_tag")
+                for i, (key, value) in enumerate(LETTER_VALUES.items()):
+                    if i % 2 == 0:
+                        if key == "Q":
+                            next_key, next_value = list(LETTER_VALUES.items())[i + 1]
+                            yield Static(f"{key} ma wartość: {value}        {next_key} ma wartość: {next_value}",
+                                         classes="letter_and_values_tag")
+                        else:
+                            next_key, next_value = list(LETTER_VALUES.items())[i + 1]
+                            yield Static(f"{key} ma wartość: {value}         {next_key} ma wartość: {next_value}",
+                                         classes="letter_and_values_tag")
+            with Vertical(id="description"):
+                yield Pretty("Gra polega na naprzemiennym układaniu słów przez graczy. Gracze mogą używać tylko liter które wylosuje i w danej rundzie mu przydzieli. Nawigacja po aplikacji obywa sie za pomocą przycisków oraz skrótów klawiszowych widocznych w stopce. By zagrać wpisz nazwy graczy (możesz wybrać ilość od 2 do 4), a następnie przejdź za pomocą klawisza F3 do gry. Gra odbywa się poprzez wpisywanie konkretnych liter a następnie umieszczanie ich na planszy. By wpisać literę kliknij myszką w pole `Wpisz litere` i wpisz literę :). By zatwierdzić wybór litery kliknij przycisk enter na klawiaturze. Pamiętaj, że możesz używać wpisaćtylko i wyłącznie litery które masz w `kieszeni` (są wypisane pod planszą). Jeśli po wciśnięciu klawisza enter nie wyświetliła Ci się czerwona obwódka, to znaczy, że aplikacja prawidłowo wczytała twoją literę, w innym wypadku oznacza to, że nie jesteś w posiadaniu litery której chcesz użyć. W tym momencie powinieneś kliknąć dowolne miejsce na planszy w którym chcesz postawić literkę. Pamiętaj, że pole musi być puste! Jeśli chcesz `podnieść` literkę którą umieściłeś w trakcie obecnej rundy kliknij ponownie na pole w którym ją umieściłeś. Wówczas zniknie ona z planszy i wróci do twojej `kieszeni`. Gdy ułożysz jakieś słowo kliknij przycisk `Zatwierdź ruch`. Wówczas program sprawdzi poprawność twojego słowa i jeśli znajduje się w słowniku (angielskim) przydzieli Ci punkty. Pamiętaj, że gra musi zacząć się od pola startowego (8, 8)! W następnych rundach do tworzenia swoich słów musisz koniecznie wykorzystywać litery zawarte na planszy. Gra kończy się gdy któryś gracz złoży wszystkie swoje litery, gdy nastąpi odpowiednia ilość pominiętych tur lub w momencie gdy któryś gracz kliknie przycisk `Zakończ grę`. Wówczas aplikacja przekierowuje do widoku z punktacją oraz wyświetla słowa wpisane przez użytkowników razem z ich punktacją. ", classes="letter_and_values_tag")
+
 
 
 class GameScreen(Screen):

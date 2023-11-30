@@ -91,6 +91,8 @@ NicknameInsertPlace {
     height: 5;
     padding: 1;
     background: gray 20%;
+    margin-top: 2;
+    margin-bottom: 2;
 }
 
 .information_tag {
@@ -126,20 +128,24 @@ ScorePretty {
     color: green;
     width: 30%;
     height: auto;
-    background: gray 20%;
     padding: 2;
-    margin-left: 20;
+    background: gray 10%;
+}
+
+#score_view2 {
+    color: green;
+    width: 30%;
+    height: auto;
+    padding: 2;
 }
 
 #word_view {
     color: green;
     width: 30%;
     height: auto;
-    background: gray 20%;
     padding: 2;
     dock: right;
     margin-top: 1;
-    margin-right: 20;
 }
 
 ScoreBoard {
@@ -151,11 +157,41 @@ ScoreBoard {
     align: left middle;
     color: green;
     height: 100%;
+    margin-left: 4;
+    margin-right: 4;
+    margin-top: 2;
+    margin-bottom: 2;
+    padding: 2;
     background: gray 10%;
+}
+
+#description {
+    align: right middle;
+    color: green;
+    height: 100%;
+    margin-left: 4;
+    margin-right: 4;
+    margin-top: 2;
+    margin-bottom: 2;
+    padding: 2;
+    background: gray 10%;
+}
+
+
+.help_labels {
+    width: 100%;
+    height: auto;
 }
 
 .letter_and_values_tag {
     width: auto;
     margin-bottom: 1;
     margin-left: 1;
+}
+
+#end_game_container {
+    width: 100%;
+    height: auto;
+    background: gray 20%;
+    margin: 4;
 }
