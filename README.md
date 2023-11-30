@@ -3,7 +3,9 @@
 `pip install -r requirements.txt`
 2. switch to venv
 `source venv/bin/activate`
-3. run in dev mode
+3. run
+`python main.py`
+4. run in dev mode
 `textual run --dev main.py`
 
 ## Authors
