@@ -1,11 +1,13 @@
 # How to run?
-1. Install required packages
-`pip install -r requirements.txt`
+1. Clone repo
+`git clone git@github.com:mateuszhorczak/KCK_Scrabble.git`
 2. switch to venv
 `source venv/bin/activate`
-3. run
+3. Install required packages
+`pip install -r requirements.txt`
+4. run
 `python main.py`
-4. run in dev mode
+5. if you want run in dev mode, you can do it with
 `textual run --dev main.py`
 
 ## Authors
