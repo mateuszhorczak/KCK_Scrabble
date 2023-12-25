@@ -2,7 +2,7 @@ from controller.controller import get_player_index, turn, start_game
 from model.model import Tile, Letter
 from config import global_variables as gv
 from config.global_variables import (TRIPLE_WORD_SCORE, DOUBLE_WORD_SCORE, TRIPLE_LETTER_SCORE, DOUBLE_LETTER_SCORE,
-                                     LETTER_VALUES)
+                                     LETTER_VALUES, GAME_INSTRUCTION)
 
 from textual import on
 from textual.app import App, ComposeResult
@@ -345,28 +345,7 @@ class HelpScreen(Screen):
                             yield Static(f"{key} ma wartość: {value}         {next_key} ma wartość: {next_value}",
                                          classes="letter_and_values_tag")
             with Vertical(id="description"):
-                yield Pretty(
-                    "Gra polega na naprzemiennym układaniu słów przez graczy. Gracze mogą używać tylko liter które "
-                    "wylosuje i w danej rundzie mu przydzieli. Nawigacja po aplikacji obywa sie za pomocą przycisków "
-                    "oraz skrótów klawiszowych widocznych w stopce. By zagrać wpisz nazwy graczy (możesz wybrać ilość "
-                    "od 2 do 4), a następnie przejdź za pomocą klawisza F3 do gry. Gra odbywa się poprzez wpisywanie "
-                    "konkretnych liter a następnie umieszczanie ich na planszy. By wpisać literę kliknij myszką w "
-                    "pole `Wpisz litere` i wpisz literę :). By zatwierdzić wybór litery kliknij przycisk enter na "
-                    "klawiaturze. Pamiętaj, że możesz używać wpisaćtylko i wyłącznie litery które masz w `kieszeni` ("
-                    "są wypisane pod planszą). Jeśli po wciśnięciu klawisza enter nie wyświetliła Ci się czerwona "
-                    "obwódka, to znaczy, że aplikacja prawidłowo wczytała twoją literę, w innym wypadku oznacza to, "
-                    "że nie jesteś w posiadaniu litery której chcesz użyć. W tym momencie powinieneś kliknąć dowolne "
-                    "miejsce na planszy w którym chcesz postawić literkę. Pamiętaj, że pole musi być puste! Jeśli "
-                    "chcesz `podnieść` literkę którą umieściłeś w trakcie obecnej rundy kliknij ponownie na pole w "
-                    "którym ją umieściłeś. Wówczas zniknie ona z planszy i wróci do twojej `kieszeni`. Gdy ułożysz "
-                    "jakieś słowo kliknij przycisk `Zatwierdź ruch`. Wówczas program sprawdzi poprawność twojego "
-                    "słowa i jeśli znajduje się w słowniku (angielskim) przydzieli Ci punkty. Pamiętaj, że gra musi "
-                    "zacząć się od pola startowego (8, 8)! W następnych rundach do tworzenia swoich słów musisz "
-                    "koniecznie wykorzystywać litery zawarte na planszy. Gra kończy się gdy któryś gracz złoży "
-                    "wszystkie swoje litery, gdy nastąpi odpowiednia ilość pominiętych tur lub w momencie gdy któryś "
-                    "gracz kliknie przycisk `Zakończ grę`. Wówczas aplikacja przekierowuje do widoku z punktacją oraz "
-                    "wyświetla słowa wpisane przez użytkowników razem z ich punktacją. ",
-                    classes="letter_and_values_tag")
+                yield Pretty(GAME_INSTRUCTION, classes="letter_and_values_tag")
 
 
 class GameScreen(Screen):

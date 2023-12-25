@@ -1,4 +1,4 @@
-from view.gui_view import ScrabbleStartGui as appGUI
+from view.gui_view import ScrabbleApp as appGUI
 from view.tui_view import ScrabbleApp as appTUI
 
 from tkinter import *
@@ -12,14 +12,5 @@ if __name__ == "__main__":
         app = appTUI()
         app.run()
     else:
-        # Tutaj utwórz kontroler dla swojej aplikacji
-
-        # Utwórz główne okno
-        root = tk.Tk()
-        views_stack = []
-
-        # Przekaż kontroler do GUI
-        app = appGUI(root)
-
-        # Uruchom główną pętlę
-        root.mainloop()
+        app = appGUI()
+        app.mainloop()
