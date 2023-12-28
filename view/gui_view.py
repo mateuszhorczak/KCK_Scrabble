@@ -1,9 +1,9 @@
-from sys import maxsize
 from tkinter import *
 import tkinter as tk
 from tkinter import ttk
 
-from config.global_variables import GAME_INSTRUCTION, LETTER_VALUES
+from config.global_variables import GAME_INSTRUCTION, LETTER_VALUES, TRIPLE_LETTER_SCORE, DOUBLE_LETTER_SCORE, \
+    DOUBLE_WORD_SCORE, TRIPLE_WORD_SCORE
 
 
 class ScrabbleApp(tk.Tk):
@@ -161,48 +161,129 @@ class HelpBoardView(BaseView):
         self.back_button.grid(row=4, column=1, columnspan=3, padx=10, pady=10)
 
 
+
 class ScrabbleBoardView(tk.Frame):
     def __init__(self, parent, controller):
         super().__init__(parent)
         self.controller = controller
 
-        # Przykładowe dane o planszy (15x15)
         self.board_data = [[' ' for _ in range(15)] for _ in range(15)]
 
         # Konfiguracja kolumn i wierszy planszy
-        for i in range(15):
-            self.grid_columnconfigure(i, minsize=30, weight=1, uniform="columns")
-            self.grid_rowconfigure(i, minsize=30, weight=1, uniform="rows")
+        for i in range(16):
+            # Ustawienie mniejszej szerokości kolumny dla numeracji po lewej stronie
+            if i == 0:
+                self.grid_columnconfigure(i, minsize=20, weight=0)
+            else:
+                self.grid_columnconfigure(i, minsize=120, weight=1, uniform="columns")
+
+            # Ustawienie mniejszej wysokosci wiersza dla numeracji wierszy po na górze
+            if i == 0:
+                self.grid_rowconfigure(i, minsize=20, weight=0)
+            else:
+                self.grid_rowconfigure(i, minsize=60, weight=1, uniform="rows")
 
         # Numeracja siatki pól
         for i in range(15):
+            # Numeracja kolumn na górze
+            (tk.Label(self, text=str(i + 1), fg="red", font="Helvetica 12 bold")
+             .grid(row=0, column=i + 1, sticky="nsew"))
+
+            # Numeracja wierszy po lewej stronie
+            (tk.Label(self, text=str(i + 1), fg="red", font="Helvetica 12 bold")
+             .grid(row=i + 1, column=0, sticky="nsew"))
+
             for j in range(15):
-                label = tk.Label(self, text=f"{i + 1} - {j + 1}", borderwidth=1, relief="solid", width=4, height=2,
-                                 font=("Helvetica", 14))
-                label.grid(row=i, column=j, sticky="nsew")
+                if (i, j) in TRIPLE_LETTER_SCORE:
+                    entry = PlaceholderEntry(self, placeholder="3L", bg="deepskyblue", justify="center",
+                                             font=("Helvetica", 12), width=2)
+                    entry.grid(row=i + 1, column=j + 1, sticky="nsew")
+
+                elif (i, j) in DOUBLE_LETTER_SCORE:
+                    entry = PlaceholderEntry(self, placeholder="2L", bg="palegreen", justify="center",
+                                             font=("Helvetica", 12), width=2)
+                    entry.grid(row=i + 1, column=j + 1, sticky="nsew")
+
+                elif (i, j) in TRIPLE_WORD_SCORE:
+                    entry = PlaceholderEntry(self, placeholder="3W", bg="gold1", justify="center",
+                                             font=("Helvetica", 12), width=2)
+                    entry.grid(row=i + 1, column=j + 1, sticky="nsew")
+
+                elif (i, j) in DOUBLE_WORD_SCORE:
+                    entry = PlaceholderEntry(self, placeholder="2W", bg="hotpink", justify="center",
+                                             font=("Helvetica", 12), width=2)
+                    entry.grid(row=i + 1, column=j + 1, sticky="nsew")
+                else:
+                    entry = PlaceholderEntry(self, justify="center", font=("Helvetica", 12), width=2)
+                    entry.grid(row=i + 1, column=j + 1, sticky="nsew")
+
+
+        # Dodatkowa ramka dla informacji o grze
+        self.information_frame = tk.Frame(self)
+        self.information_frame.grid(row=16, column=0, columnspan=16, sticky="nsew")
 
         # Informacje o rundzie i graczu
-        self.round_label = tk.Label(self, text="Runda: 1, Gracz: 1", font=("Helvetica", 12))
-        self.round_label.grid(row=15, column=0, columnspan=15, sticky="nsew")
+        self.round_label = tk.Label(self.information_frame, text="Runda: 1, Gracz: 1", font=("Helvetica", 12))
+        self.round_label.grid(row=0, column=0, columnspan=5, sticky="nsew")
 
-        # Literki do przeciągania
-        self.letters_container = tk.Frame(self)
-        self.letters_container.grid(row=16, column=0, columnspan=15, sticky="nsew")
+        # Literki
+        self.letters_container = tk.Label(self.information_frame, text="Literki", font=("Helvetica", 12))
+        self.letters_container.grid(row=0, column=6, columnspan=5, sticky="nsew")
+
+        # Dodatkowa ramka dla przycisków
+        self.buttons_frame = tk.Frame(self)
+        self.buttons_frame.grid(row=17, column=0, columnspan=16, sticky="nsew")
 
         # Przyciski
-        self.confirm_button = ttk.Button(self, text="Zatwierdź ruch", command=lambda: self.controller.confirm_move)
-        self.skip_button = ttk.Button(self, text="Pomiń turę", command=lambda: self.controller.skip_turn)
-        self.pickup_button = ttk.Button(self, text="Podnieś swoje litery",
-                                        command=lambda: self.controller.pickup_letters)
-        self.end_game_button = ttk.Button(self, text="Zakończ grę", command=lambda: self.controller.end_game)
+        self.confirm_button = tk.Button(self.buttons_frame, text="Zatwierdź ruch", command=lambda: self.controller.confirm_move())
+        self.skip_button = tk.Button(self.buttons_frame, text="Pomiń turę", command=lambda: self.controller.skip_turn())
+        self.pickup_button = tk.Button(self.buttons_frame, text="Podnieś swoje litery",
+                                       command=lambda: self.controller.pickup_letters())
+        self.end_game_button = tk.Button(self.buttons_frame, text="Zakończ grę", command=lambda: self.controller.end_game())
 
-        self.confirm_button.grid(row=17, column=0, pady=5, sticky="nsew")
-        self.skip_button.grid(row=17, column=1, pady=5, sticky="nsew")
-        self.pickup_button.grid(row=17, column=2, pady=5, sticky="nsew")
-        self.end_game_button.grid(row=17, column=3, pady=5, sticky="nsew")
+        self.confirm_button.grid(row=0, column=0, pady=5, sticky="nsew")
+        self.skip_button.grid(row=0, column=1, pady=5, sticky="nsew")
+        self.pickup_button.grid(row=0, column=2, pady=5, sticky="nsew")
+        self.end_game_button.grid(row=0, column=3, pady=5, sticky="nsew")
+
+        self.confirm_button.configure(foreground="gray70", background="whitesmoke", font="Helvetica 12 bold", border=1,
+                                      relief="solid")
+        self.skip_button.configure(foreground="gray70", background="whitesmoke", font="Helvetica 12 bold", border=1,
+                                   relief="solid")
+        self.pickup_button.configure(foreground="gray70", background="whitesmoke", font="Helvetica 12 bold", border=1,
+                                     relief="solid")
+        self.end_game_button.configure(foreground="gray70", background="whitesmoke", font="Helvetica 12 bold", border=1,
+                                       relief="solid")
 
     def update_round_label(self, round_number, player_number):
         self.round_label.config(text=f"Runda: {round_number}, Gracz: {player_number}")
+
+
+class PlaceholderEntry(tk.Entry):
+    def __init__(self, master=None, placeholder="", color='grey', *args, **kwargs):
+        super().__init__(master, *args, **kwargs)
+
+        self.placeholder = placeholder
+        self.placeholder_color = color
+        self.default_fg_color = self['fg']
+
+        self.bind("<FocusIn>", self.on_focus_in)
+        self.bind("<FocusOut>", self.on_focus_out)
+
+        self.put_placeholder()
+
+    def put_placeholder(self):
+        self.insert(0, self.placeholder)
+        self['fg'] = self.placeholder_color
+
+    def on_focus_in(self, event):
+        if self.get() == self.placeholder:
+            self.delete(0, tk.END)
+            self['fg'] = self.default_fg_color
+
+    def on_focus_out(self, event):
+        if not self.get():
+            self.put_placeholder()
 
 
 # Kontroler (część, która obsługuje logikę gry)
