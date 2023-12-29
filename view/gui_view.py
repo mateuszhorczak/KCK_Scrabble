@@ -3,7 +3,9 @@ import tkinter as tk
 from tkinter import ttk
 
 from config.global_variables import GAME_INSTRUCTION, LETTER_VALUES, TRIPLE_LETTER_SCORE, DOUBLE_LETTER_SCORE, \
-    DOUBLE_WORD_SCORE, TRIPLE_WORD_SCORE
+    DOUBLE_WORD_SCORE, TRIPLE_WORD_SCORE, ROUND_NUMBER
+from config import global_variables as gv
+from controller.controller import start_game, get_player_index
 
 
 class ScrabbleApp(tk.Tk):
@@ -37,6 +39,26 @@ class ScrabbleApp(tk.Tk):
         frame = self.frames[cont]
         frame.tkraise()
 
+    def confirm_move(self):
+        # Logika dla zatwierdzenia ruchu
+        gv.ROUND_NUMBER += 1
+        self.frames[ScrabbleBoardView].update_round_label()
+        pass
+
+    def skip_turn(self):
+        # Logika dla pominięcia tury
+        gv.ROUND_NUMBER += 1
+        self.frames[ScrabbleBoardView].update_round_label()
+        pass
+
+    def pickup_letters(self):
+        # Logika dla podniesienia liter
+        pass
+
+    def end_game(self):
+        # Logika dla zakończenia gry
+        pass
+
 
 class BaseView(tk.Frame):
     def __init__(self, parent, controller):
@@ -47,7 +69,8 @@ class BaseView(tk.Frame):
 class MainView(BaseView):
     def __init__(self, parent, controller):
         super().__init__(parent, controller)
-        self.num_players = 2
+        self.controller = controller
+        gv.NUMBER_OF_PLAYERS = 2
         self.player_entries = []
         self.player_labels = []
 
@@ -60,7 +83,7 @@ class MainView(BaseView):
         self.players_container.grid(row=2, column=1, columnspan=3)
 
         # Pola do wprowadzania nazw graczy i ich etykiety
-        for i in range(self.num_players):
+        for i in range(gv.NUMBER_OF_PLAYERS):
             label = tk.Label(self.players_container, text=f"Gracz {i + 1}:", font=("Helvetica", 16))
             entry = tk.Entry(self.players_container, font=("Helvetica", 16))
             label.grid(row=i, column=0, padx=10, pady=10)
@@ -73,21 +96,23 @@ class MainView(BaseView):
         self.decrease_button = tk.Button(self, text="-", command=self.decrease_players, font=("Helvetica", 16))
         self.decrease_button.grid(row=3, column=1, padx=20)
 
-        self.num_players_label = tk.Label(self, text=str(self.num_players), font=("Helvetica", 16))
+        self.num_players_label = tk.Label(self, text=str(gv.NUMBER_OF_PLAYERS), font=("Helvetica", 16))
         self.num_players_label.grid(row=3, column=2, padx=20)
 
         self.increase_button = tk.Button(self, text="+", command=self.increase_players, font=("Helvetica", 16))
         self.increase_button.grid(row=3, column=3, padx=20)
 
         # Przycisk do przechodzenia do kolejnego ekranu
-        self.help_button = ttk.Button(self, text="Pomoc", command=lambda: controller.show_frame(HelpBoardView))
+        self.help_button = ttk.Button(self, text="Pomoc", command=lambda: self.controller.show_frame(HelpBoardView))
         self.help_button.grid(row=4, column=1, columnspan=3, pady=10)
         self.next_button = tk.Button(self, text="Rozpocznij grę",
-                                     command=lambda: controller.show_frame(ScrabbleBoardView), font=("Helvetica", 20))
+                                     command=lambda: [self.controller.show_frame(ScrabbleBoardView), start_game(),
+                                                      self.controller.frames[ScrabbleBoardView].update_round_label()],
+                                     font=("Helvetica", 20))
         self.next_button.grid(row=5, column=1, columnspan=3, pady=20)
 
     def decrease_players(self):
-        if self.num_players > 2:
+        if gv.NUMBER_OF_PLAYERS > 2:
             # Usuń ostatnie pole do wprowadzania
             entry_to_remove = self.player_entries.pop()
             entry_to_remove.destroy()
@@ -96,36 +121,37 @@ class MainView(BaseView):
             label_to_remove = self.player_labels.pop()
             label_to_remove.destroy()
 
-            self.num_players -= 1
-            self.num_players_label.config(text=str(self.num_players))
+            gv.NUMBER_OF_PLAYERS -= 1
+            gv.PLAYERS_NICKNAMES[gv.NUMBER_OF_PLAYERS] = ''
+            self.num_players_label.config(text=str(gv.NUMBER_OF_PLAYERS))
 
     def increase_players(self):
-        if self.num_players < 4:
+        if gv.NUMBER_OF_PLAYERS < 4:
             # Dodaj nowe pole do wprowadzania
-            new_label = tk.Label(self.players_container, text=f"Gracz {self.num_players + 1}:", font=("Helvetica", 16))
+            new_label = tk.Label(self.players_container, text=f"Gracz {gv.NUMBER_OF_PLAYERS + 1}:",
+                                 font=("Helvetica", 16))
             new_entry = tk.Entry(self.players_container, font=("Helvetica", 16))
-            new_label.grid(row=self.num_players, column=0, padx=10, pady=10)
-            new_entry.grid(row=self.num_players, column=1, padx=10, pady=10)
+            new_label.grid(row=gv.NUMBER_OF_PLAYERS, column=0, padx=10, pady=10)
+            new_entry.grid(row=gv.NUMBER_OF_PLAYERS, column=1, padx=10, pady=10)
             self.player_labels.append(new_label)
             self.player_entries.append(new_entry)
-            new_entry.bind("<Return>", lambda event, index=self.num_players: self.update_player_name(event, index))
+            new_entry.bind("<Return>", lambda event, index=gv.NUMBER_OF_PLAYERS: self.update_player_name(event, index))
 
-            self.num_players += 1
-            self.num_players_label.config(text=str(self.num_players))
+            gv.NUMBER_OF_PLAYERS += 1
+            self.num_players_label.config(text=str(gv.NUMBER_OF_PLAYERS))
 
     def update_player_name(self, event, index):
         # Zaktualizuj etykietę gracza po wciśnięciu Enter
         player_name = self.player_entries[index].get()
         self.player_labels[index].config(text=f"Gracz {index + 1}: {player_name}")
-
-    def start_game(self):
-        # Pobierz nazwy graczy z pól tekstowych
-        player_names = [entry.get() for entry in self.player_entries]
+        gv.PLAYERS_NICKNAMES[index] = player_name
+        print(gv.PLAYERS_NICKNAMES)
 
 
 class HelpBoardView(BaseView):
     def __init__(self, parent, controller):
         super().__init__(parent, controller)
+        self.controller = controller
 
         # Wycentrowany label nagłówkowy
         self.header_label = tk.Label(self, text="Pomoc Scrabble", font=("Helvetica", 20))
@@ -157,16 +183,14 @@ class HelpBoardView(BaseView):
                                          font="Helvetica 16 bold")
         self.info_label_right.grid(row=0, column=0, padx=10, pady=10)
 
-        self.back_button = ttk.Button(self, text="Powrót", command=lambda: controller.show_frame(MainView))
+        self.back_button = ttk.Button(self, text="Powrót", command=lambda: self.controller.show_frame(MainView))
         self.back_button.grid(row=4, column=1, columnspan=3, padx=10, pady=10)
-
 
 
 class ScrabbleBoardView(tk.Frame):
     def __init__(self, parent, controller):
         super().__init__(parent)
         self.controller = controller
-
         self.board_data = [[' ' for _ in range(15)] for _ in range(15)]
 
         # Konfiguracja kolumn i wierszy planszy
@@ -179,7 +203,7 @@ class ScrabbleBoardView(tk.Frame):
 
             # Ustawienie mniejszej wysokosci wiersza dla numeracji wierszy po na górze
             if i == 0:
-                self.grid_rowconfigure(i, minsize=20, weight=0)
+                self.grid_rowconfigure(i, minsize=10, weight=0)
             else:
                 self.grid_rowconfigure(i, minsize=60, weight=1, uniform="rows")
 
@@ -217,14 +241,15 @@ class ScrabbleBoardView(tk.Frame):
                     entry = PlaceholderEntry(self, justify="center", font=("Helvetica", 12), width=2)
                     entry.grid(row=i + 1, column=j + 1, sticky="nsew")
 
-
         # Dodatkowa ramka dla informacji o grze
         self.information_frame = tk.Frame(self)
         self.information_frame.grid(row=16, column=0, columnspan=16, sticky="nsew")
 
         # Informacje o rundzie i graczu
-        self.round_label = tk.Label(self.information_frame, text="Runda: 1, Gracz: 1", font=("Helvetica", 12))
+        self.round_label = tk.Label(self.information_frame, text=f"Runda: {ROUND_NUMBER}, tura: ",
+                                    font=("Helvetica", 12))
         self.round_label.grid(row=0, column=0, columnspan=5, sticky="nsew")
+        print(gv.PLAYERS)
 
         # Literki
         self.letters_container = tk.Label(self.information_frame, text="Literki", font=("Helvetica", 12))
@@ -235,11 +260,13 @@ class ScrabbleBoardView(tk.Frame):
         self.buttons_frame.grid(row=17, column=0, columnspan=16, sticky="nsew")
 
         # Przyciski
-        self.confirm_button = tk.Button(self.buttons_frame, text="Zatwierdź ruch", command=lambda: self.controller.confirm_move())
+        self.confirm_button = tk.Button(self.buttons_frame, text="Zatwierdź ruch",
+                                        command=lambda: self.controller.confirm_move())
         self.skip_button = tk.Button(self.buttons_frame, text="Pomiń turę", command=lambda: self.controller.skip_turn())
         self.pickup_button = tk.Button(self.buttons_frame, text="Podnieś swoje litery",
                                        command=lambda: self.controller.pickup_letters())
-        self.end_game_button = tk.Button(self.buttons_frame, text="Zakończ grę", command=lambda: self.controller.end_game())
+        self.end_game_button = tk.Button(self.buttons_frame, text="Zakończ grę",
+                                         command=lambda: self.controller.end_game())
 
         self.confirm_button.grid(row=0, column=0, pady=5, sticky="nsew")
         self.skip_button.grid(row=0, column=1, pady=5, sticky="nsew")
@@ -255,8 +282,9 @@ class ScrabbleBoardView(tk.Frame):
         self.end_game_button.configure(foreground="gray70", background="whitesmoke", font="Helvetica 12 bold", border=1,
                                        relief="solid")
 
-    def update_round_label(self, round_number, player_number):
-        self.round_label.config(text=f"Runda: {round_number}, Gracz: {player_number}")
+    def update_round_label(self):
+        index = get_player_index()
+        self.round_label.config(text=f"Runda: {gv.ROUND_NUMBER}, Gracz: {gv.PLAYERS[index].get_name()}")
 
 
 class PlaceholderEntry(tk.Entry):
@@ -284,52 +312,3 @@ class PlaceholderEntry(tk.Entry):
     def on_focus_out(self, event):
         if not self.get():
             self.put_placeholder()
-
-
-# Kontroler (część, która obsługuje logikę gry)
-class ScrabbleController:
-    def __init__(self, root):
-        self.root = root
-        self.current_round = 1
-        self.current_player = 1
-
-        # Inicjalizacja widoku startowego
-        self.start_view = MainView(root, self)
-        self.start_view.grid(row=0, column=0, sticky="nsew")
-
-        # Inicjalizacja widoku pomocy
-        self.help_view = HelpBoardView(root, self)
-        self.help_view.grid(row=0, column=0, sticky="nsew")
-
-        # Inicjalizacja widoku planszy gry
-        self.board_view = ScrabbleBoardView(root, self)
-        self.board_view.grid(row=0, column=0, sticky="nsew")
-        self.board_view.grid_remove()  # Ukryj planszę na początku
-
-        # Ustawienie przycisków do zmiany widoku
-        self.start_view.next_button.config(command=self.show_board)
-        self.help_view.back_button.config(command=self.show_start)
-
-    def show_start(self):
-        self.board_view.grid_remove()
-        self.start_view.grid()
-
-    def show_board(self):
-        self.start_view.grid_remove()
-        self.board_view.grid()
-
-    def confirm_move(self):
-        # Logika dla zatwierdzenia ruchu
-        pass
-
-    def skip_turn(self):
-        # Logika dla pominięcia tury
-        pass
-
-    def pickup_letters(self):
-        # Logika dla podniesienia liter
-        pass
-
-    def end_game(self):
-        # Logika dla zakończenia gry
-        pass
