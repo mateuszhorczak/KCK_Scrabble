@@ -5,7 +5,7 @@ from tkinter import *
 from tkinter import ttk
 import tkinter as tk
 
-tui = True
+tui = False
 
 if __name__ == "__main__":
     if tui:

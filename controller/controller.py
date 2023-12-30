@@ -14,13 +14,11 @@ def get_player_index():
 
 def start_game():
     """Function that start the game"""
-    print('start game weszło')
     gv.BOARD = Board()
     gv.BAG = Bag()
     for i in range(gv.NUMBER_OF_PLAYERS):
         gv.PLAYERS.append(Player(gv.BAG))
         gv.PLAYERS[i].set_name(gv.PLAYERS_NICKNAMES[i])
-        print(gv.PLAYERS[i].get_name())
 
 
 def turn(player):
