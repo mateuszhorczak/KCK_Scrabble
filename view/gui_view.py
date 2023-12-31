@@ -5,7 +5,7 @@ from tkinter import ttk
 from config.global_variables import GAME_INSTRUCTION, LETTER_VALUES, TRIPLE_LETTER_SCORE, DOUBLE_LETTER_SCORE, \
     DOUBLE_WORD_SCORE, TRIPLE_WORD_SCORE, ROUND_NUMBER
 from config import global_variables as gv
-from controller.controller import start_game, get_player_index
+from controller.controller import start_game, get_player_index, turn
 from model.model import Letter, Tile
 
 
@@ -43,6 +43,20 @@ class ScrabbleApp(tk.Tk):
     def confirm_move(self):
         """approve movement"""
 
+        word_score = turn(gv.PLAYERS[get_player_index()])
+        print(word_score)
+        if word_score > 0:
+            gv.PLAYED_WORDS.append([gv.ACTUAL_WORD_WITH_COORDS, gv.PLAYERS[get_player_index()], word_score])
+        else:
+            self.pickup_letters()
+
+        """Reset word array"""
+        gv.ACTUAL_WORD_WITH_COORDS = []
+
+        """Check if this is the last round"""
+        # self.if_end_game() TODO
+
+        gv.PLAYERS[get_player_index()].rack.replenish_rack()
         gv.ROUND_NUMBER += 1
         self.frames[ScrabbleBoardView].update_round_label()
         pass
@@ -61,6 +75,12 @@ class ScrabbleApp(tk.Tk):
                 entry = self.frames[ScrabbleBoardView].grid_slaves(row=row + 1, column=col + 1)[0]
                 if entry.approved_round == gv.ROUND_NUMBER:
                     entry.delete(0, tk.END)
+                    gv.PLAYERS[get_player_index()].rack.append_letter(
+                        Tile(gv.BOARD.get_board_array()[row][col].get_value())
+                    )
+                    gv.BOARD.get_board_array()[row][col] = None
+                    entry.approved_round = None
+                    self.frames[ScrabbleBoardView].update_round_label()
 
     def end_game(self):
         # Logika dla zakończenia gry
@@ -152,7 +172,6 @@ class MainView(BaseView):
         player_name = self.player_entries[index].get()
         self.player_labels[index].config(text=f"Gracz {index + 1}: {player_name}")
         gv.PLAYERS_NICKNAMES[index] = player_name
-        print(gv.PLAYERS_NICKNAMES)
 
 
 class HelpBoardView(BaseView):
@@ -333,8 +352,12 @@ class PlaceholderEntry(tk.Entry):
     def validate_input(self, event):
         if event.keysym != "BackSpace" and event.keysym.upper() not in LETTER_VALUES.keys():
             return
+        if self.approved_round is not None and self.approved_round != gv.ROUND_NUMBER:
+            if event.keysym == "BackSpace":
+                self.insert(0, self.value)
+            self.bell()
+            self.delete(1, tk.END)
         entered_value = self.get().upper()
-        print(entered_value)
         if len(entered_value) > 1:
             value = entered_value[1]
         else:
@@ -360,11 +383,12 @@ class PlaceholderEntry(tk.Entry):
 
             elif len(entered_value) == 0 and event.keysym == "BackSpace":
                 """clear entry"""
-                print('kasowanie')
                 gv.BOARD.get_board_array()[self.row][self.col] = None
-                print('na polu stala litera: ' + self.value)
                 gv.PLAYERS[get_player_index()].rack.append_letter(Tile(self.value))
-                gv.ACTUAL_WORD_WITH_COORDS.pop()  # TODO CHECK THIS POP, jakim cudem to niby dziala w TUI WTF
+
+                for l, letter in enumerate(gv.ACTUAL_WORD_WITH_COORDS):
+                    if letter.get_x() == self.col and letter.get_y() == self.row:
+                        gv.ACTUAL_WORD_WITH_COORDS.pop(l)
                 self.value = None
                 self.approved_round = None
 
@@ -375,14 +399,15 @@ class PlaceholderEntry(tk.Entry):
 
                 """if replace previous sign in entry"""
                 if self.value is not None:
-                    print('zmieniam znak' + self.value)
-                    user_letters = gv.PLAYERS[get_player_index()].rack.get_rack_arr()
-                    for tile in user_letters:
-                        print(tile.get_letter() + 'vs' + self.value)
-                        if tile.get_letter() == self.value:
-                            gv.PLAYERS[get_player_index()].rack.remove_from_rack(tile)
-                            print('wrzucam do torby podniesione:' + tile.get_letter())
-                            break
+                    # user_letters = gv.PLAYERS[get_player_index()].rack.get_rack_arr()
+                    # for tile in user_letters:
+                    #     print(tile.get_letter() + 'vs' + self.value)
+                    #     if tile.get_letter() == self.value:
+                    #         gv.PLAYERS[get_player_index()].rack.remove_from_rack(tile)
+                    for l, letter in enumerate(gv.ACTUAL_WORD_WITH_COORDS):
+                        if letter.get_x() == self.col and letter.get_y() == self.row:
+                            gv.ACTUAL_WORD_WITH_COORDS.pop(l)
+                    # break
                     gv.PLAYERS[get_player_index()].rack.append_letter(Tile(self.value))
 
                     user_letters = gv.PLAYERS[get_player_index()].rack.get_rack_arr()
@@ -393,7 +418,6 @@ class PlaceholderEntry(tk.Entry):
 
                 else:
                     """Add letter to empty field"""
-                    print('dodaje znak w puste')
                     user_letters = gv.PLAYERS[get_player_index()].rack.get_rack_arr()
                     for tile in user_letters:
                         if tile.get_letter() == value:
@@ -402,6 +426,8 @@ class PlaceholderEntry(tk.Entry):
 
                 self.approved_round = gv.ROUND_NUMBER
                 self.value = value
+                self.delete(0, tk.END)
+                self.insert(0, self.value)
                 gv.BOARD.get_board_array()[self.row][self.col] = Letter(self.row, self.col, self.value)
                 gv.ACTUAL_WORD_WITH_COORDS.append(Letter(self.row, self.col, self.value))
         self.parent.controller.frames[ScrabbleBoardView].update_round_label()

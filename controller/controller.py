@@ -123,7 +123,7 @@ def turn(player):
                             return 0
 
                     """Combine user letters with letters on the board"""
-                    new_word = word_to_play + break_letters + letter_in_word.get_value()
+                    new_word = word_to_play + letter_in_word.get_value() + break_letters
                     word_to_play = new_word
                     used_other_word = True
 
@@ -213,7 +213,7 @@ def turn(player):
                             return 0
 
                     """Combine user letters with letters on the board"""
-                    new_word = word_to_play + break_letters + letter_in_word.get_value()
+                    new_word = word_to_play + letter_in_word.get_value() + break_letters
                     word_to_play = new_word
                     used_other_word = True
 
@@ -266,7 +266,7 @@ def turn(player):
 
         """Initialize word"""
         word = Word(player, word_to_play, used_other_word)
-
+        print(word_to_play)
         """If word is correct then points are added"""
         if word.check_words():
             word_score = word.calculate_word_score()
