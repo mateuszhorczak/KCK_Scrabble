@@ -266,7 +266,6 @@ def turn(player):
 
         """Initialize word"""
         word = Word(player, word_to_play, used_other_word)
-        print(word_to_play)
         """If word is correct then points are added"""
         if word.check_words():
             word_score = word.calculate_word_score()

@@ -13,6 +13,7 @@ mdit-py-plugins==0.4.0
 mdurl==0.1.2
 msgpack==1.0.7
 multidict==6.0.4
+Pillow==10.1.0
 Pygments==2.16.1
 rich==13.6.0
 textual==0.42.0
