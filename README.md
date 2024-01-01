@@ -9,13 +9,15 @@ This repository contains the source code for a Scrabble game implemented in Pyth
 # How to run?
 1. Clone repo
 `git clone git@github.com:mateuszhorczak/KCK_Scrabble.git`
-2. switch to venv
+2. Init virtual environment
+`python -m venv venv`
+3. Switch to venv
 `source venv/bin/activate`
-3. Install required packages
+4. Install required packages
 `pip install -r requirements.txt`
-4. run
+5. run
 `python main.py`
-5. if you want run in dev mode, you can do it with
+6. if you want run in dev mode, you can do it with
 `textual run --dev main.py`
 
 ## Gameplay Preview
